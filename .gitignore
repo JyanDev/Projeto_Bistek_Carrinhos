@@ -60,6 +60,7 @@ venv/
 ENV/
 env.bak/
 venv.bak/
+venv_btcar/
 
 # Editors (VS Code, JetBrains, etc)
 .vscode/
