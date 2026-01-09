@@ -47,21 +47,24 @@ Simula a tela touch que o cliente veria no carrinho.
 Ter o Python instalado e a biblioteca Pygame:
 ```bash
 pip install pygame
-Passo 1: Criar o Mapa (Opcional)
-Se quiser desenhar sua própria loja:
-
 ```
+### Passo 1: Criar o Mapa (Opcional)
+Se quiser desenhar sua própria loja:
 ```bash
 python mapa_build.py
+```
 Use o mouse para desenhar e ENTER para confirmar zonas. Pressione 'S' para salvar o loja_mapa_v3.json.
 
-Passo 2: Rodar a Simulação
+### Passo 2: Rodar a Simulação
 Para iniciar o sistema do carrinho:
 
+```bash
 python main_tablet.py
-Controles: Use as setas do teclado (ou WASD) para mover o "carrinho" pela loja e veja a interface reagir às mudanças de corredor.
-
-Login Admin: Digite admin no CPF para ver o modo debug.
 ```
+### Controles:
+Use as setas do teclado (ou WASD) para mover o "carrinho" pela loja e veja a interface reagir às mudanças de corredor.
+
+### Login Admin: Digite admin no CPF para ver o modo debug.
+
 
 Desenvolvido com foco em inovação para o varejo.
