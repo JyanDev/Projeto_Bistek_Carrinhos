@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Clube Bistek</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+</head>
+<body>
+
+    <div id="app-container">
+        <div id="screen-content">
+
+            <div id="login-overlay">
+                <div class="login-box" id="login-form-container">
+                    <h1>Acesso <span class="clube-gradient">Clube</span> Bistek</h1>
+                    <p>Informe seu CPF para continuar</p>
+
+                    <div class="input-group">
+                        <span class="material-icons">person</span>
+                        <input type="text" id="cpf-input" placeholder="000.000.000-00" autofocus>
+                    </div>
+
+                    <button class="btn-primary" onclick="doLogin()">ACESSAR SISTEMA</button>
+                    <button class="btn-secondary" onclick="toggleRegisterView(true)">Cadastrar Novo Cliente</button>
+
+                    <p id="login-error" class="error-msg" style="display: none;">CPF não encontrado na base de dados.</p>
+                </div>
+
+                <div class="login-box" id="register-form-container" style="display: none;">
+                    <h1>Novo Cadastro</h1>
+
+                    <div class="form-grid">
+                        <input type="text" id="reg-cpf" placeholder="CPF (Somente Números)">
+                        <input type="text" id="reg-nome" placeholder="Nome Completo">
+                    </div>
+
+                    <div class="employee-check">
+                        <input type="checkbox" id="check-employee" onchange="toggleEmployeeFields()">
+                        <label for="check-employee">Colaborador Bistek</label>
+                    </div>
+
+                    <div id="employee-fields" style="display: none;">
+                        <div class="form-grid">
+                            <input type="text" id="reg-matricula" placeholder="Matrícula">
+                            <input type="text" id="reg-cargo" placeholder="Cargo / Ocupação">
+                        </div>
+                    </div>
+
+                    <button class="btn-primary" onclick="doRegister()">FINALIZAR CADASTRO</button>
+                    <button class="btn-text" onclick="toggleRegisterView(false)">Voltar para Login</button>
+
+                    <p id="reg-error" class="error-msg" style="display: none;"></p>
+                </div>
+            </div>
+
+            <header>
+                <div class="logo">
+                    <h1><span class="clube-gradient">Clube</span> Bistek</h1>
+                </div>
+                <div class="user-info">
+                    <span class="material-icons">account_circle</span>
+                    <span id="user-display">Identifique-se</span>
+                </div>
+            </header>
+
+            <main>
+                <section class="cart-panel">
+                    <div class="cart-header">
+                        <span class="material-icons">shopping_cart</span>
+                        SUAS COMPRAS
+                    </div>
+                    <div class="item-list" id="cart-container">
+                        </div>
+                    <div class="cart-total">
+                        <span>Subtotal</span>
+                        <span id="total-price">R$ 0,00</span>
+                    </div>
+                </section>
+
+                <section class="smart-panel">
+                    <div class="context-card" id="offer-card">
+                        <div class="location-header">
+                            <span class="material-icons">place</span>
+                            <span>VOCÊ ESTÁ EM:</span>
+                        </div>
+                        <h2 id="location-name">CORREDOR GERAL</h2>
+
+                        <div class="offer-divider"></div>
+
+                        <div class="offer-container">
+                            <span class="offer-label">Oferta Relâmpago:</span>
+                            <div class="offer-text" id="offer-text">Navegue para ver promoções...</div>
+                        </div>
+                    </div>
+
+                    <div class="map-widget">
+                        <canvas id="map-canvas"></canvas>
+                    </div>
+                </section>
+            </main>
+
+            <footer>
+                <div class="footer-item">
+                    <span class="material-icons">schedule</span>
+                    <span>Aberto: 07:20 - 22:00</span>
+                </div>
+
+                <div class="footer-item user-details">
+                    <span class="material-icons">badge</span>
+                    <span id="footer-type">Visitante</span>
+                    <span class="separator">|</span>
+                    <span id="footer-cpf">CPF: --</span>
+                </div>
+
+                <div class="footer-item">
+                    <span class="material-icons">access_time</span>
+                    <span id="clock-display">00:00</span>
+                </div>
+            </footer>
+
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
+</body>
+</html>

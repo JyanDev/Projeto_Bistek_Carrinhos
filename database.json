@@ -1,0 +1,67 @@
+{
+  "users": {
+    "admin": {
+      "nome": "Administrador do Sistema",
+      "tipo": "admin"
+    },
+    "00000000000": {
+      "nome": "Cliente Teste",
+      "tipo": "cliente"
+    },
+    "04645036041": {
+      "nome": "Jyan da Silva Jagielo",
+      "tipo": "cliente",
+      "cpf_display": "04645036041"
+    },
+    "12345678900": {
+      "nome": "Testador",
+      "tipo": "Funcionário - OP CAIXA (Mat: 1111111)"
+    },
+    "03873163020": {
+      "nome": "Luisa Fonseca Rodrigues",
+      "tipo": "Funcionário - OP CAIXA (Mat: 260066)"
+    }
+  },
+  "products": [
+    {
+      "nome": "Arroz Tio João 5kg",
+      "preco": 28.9,
+      "icon": "inventory_2"
+    },
+    {
+      "nome": "Feijão Preto 1kg",
+      "preco": 8.5,
+      "icon": "grain"
+    },
+    {
+      "nome": "Azeite Gallo 500ml",
+      "preco": 42.0,
+      "icon": "water_drop"
+    },
+    {
+      "nome": "Coca-Cola 2L",
+      "preco": 9.99,
+      "icon": "local_drink"
+    },
+    {
+      "nome": "Picanha Maturada (kg)",
+      "preco": 69.9,
+      "icon": "restaurant"
+    },
+    {
+      "nome": "Cerveja Heineken",
+      "preco": 5.49,
+      "icon": "sports_bar"
+    },
+    {
+      "nome": "Leite Integral",
+      "preco": 4.59,
+      "icon": "water"
+    },
+    {
+      "nome": "Chocolate Lacta",
+      "preco": 6.99,
+      "icon": "cookie"
+    }
+  ]
+}

@@ -1,0 +1,2171 @@
+--- INICIO DO CONTEXTO DO PROJETO ---
+Este arquivo contem todos os codigos fontes concatenados.
+Formato:
+=== ARQUIVO: [caminho] ===
+[conteudo]
+
+
+========== ARQUIVO: app.py ==========
+from flask import Flask, render_template, jsonify, request
+from gps_engine import GPSEngine
+import json
+import random
+import time
+import sys
+import subprocess
+from threading import Thread
+
+app = Flask(__name__)
+
+# --- GERENCIAMENTO DE DADOS ---
+def load_db():
+    try:
+        with open("database.json", "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception as e:
+        print(f"❌ Erro ao ler DB: {e}")
+        return {"users": {}, "products": []}
+
+def save_db(data):
+    try:
+        with open("database.json", "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=2, ensure_ascii=False)
+        return True
+    except Exception as e:
+        print(f"❌ Erro ao salvar DB: {e}")
+        return False
+
+DB = load_db()
+
+# --- TÚNEL HÍBRIDO ---
+def start_tunnel():
+    print("🚇 Iniciando Túnel Cloudflare...")
+    time.sleep(3)
+    try:
+        subprocess.Popen(["cloudflared", "tunnel", "--url", "http://localhost:5000"])
+    except:
+        print("⚠️ Cloudflared não encontrado. Rodando local.")
+
+engine = GPSEngine()
+cart_state = {
+    "user": None,
+    "cart_items": [],
+    "total": 0.00,
+    "theme": "green"
+}
+
+@app.route('/')
+def tablet_view(): return render_template('tablet.html')
+
+@app.route('/controle')
+def remote_view(): return render_template('remote.html')
+
+# --- API: CADASTRO ---
+@app.route('/api/register', methods=['POST'])
+def register_user():
+    global DB
+    data = request.json
+    cpf_clean = data.get('cpf', '').replace('.', '').replace('-', '')
+    nome = data.get('nome')
+    is_employee = data.get('is_employee')
+
+    if cpf_clean in DB["users"]:
+        return jsonify({"success": False, "message": "CPF já cadastrado."})
+
+    # Define o tipo de usuário
+    user_type = "cliente"
+    if is_employee:
+        cargo = data.get('cargo', 'Funcionário')
+        matricula = data.get('matricula', '')
+        user_type = f"Funcionário - {cargo} (Mat: {matricula})"
+
+    # Cria e Salva
+    new_user = {"nome": nome, "tipo": user_type}
+    DB["users"][cpf_clean] = new_user
+
+    if save_db(DB):
+        return jsonify({"success": True})
+    else:
+        return jsonify({"success": False, "message": "Erro ao gravar no banco."})
+
+# --- API: LOGIN ---
+@app.route('/api/login', methods=['POST'])
+def login():
+    global DB
+    DB = load_db()
+
+    data = request.json
+    cpf_clean = data.get('cpf', '').replace('.', '').replace('-', '')
+
+    user = DB["users"].get(cpf_clean)
+
+    if user:
+        # ZERA O CARRINHO AO TROCAR DE USUÁRIO
+        cart_state["cart_items"] = []
+        cart_state["total"] = 0.00
+
+        cart_state['user'] = user
+        cart_state['user']['cpf_display'] = cpf_clean
+        return jsonify({"success": True, "user": user})
+    elif cpf_clean.lower() == "admin":
+        # Admin também zera pra começar limpo
+        cart_state["cart_items"] = []
+        cart_state["total"] = 0.00
+
+        cart_state['user'] = DB["users"].get("admin", {"nome": "Admin", "tipo": "admin"})
+        return jsonify({"success": True, "user": cart_state['user']})
+    else:
+        return jsonify({"success": False})
+# --- OUTRAS ROTAS (Cart, Move, Status) ---
+@app.route('/api/status')
+def get_status():
+    info = engine.get_info()
+    return jsonify({
+        "pos_x": engine.player_rect.centerx,
+        "pos_y": engine.player_rect.centery,
+        "setor": info["setor"],
+        "oferta": info["oferta"],
+        "theme": cart_state["theme"],
+        "cart": cart_state["cart_items"],
+        "total": cart_state["total"],
+        "user": cart_state["user"]
+    })
+
+@app.route('/api/cart/add_random', methods=['POST'])
+def add_random_item():
+    if not DB["products"]: return jsonify({"error": "Vazio"})
+    p = random.choice(DB["products"])
+    item = {"id": int(time.time()*1000), "nome": p["nome"], "preco": p["preco"], "icon": p.get("icon", "shopping_bag")}
+    cart_state["cart_items"].append(item)
+    cart_state["total"] += item["preco"]
+    return jsonify({"success": True})
+
+@app.route('/api/cart/remove', methods=['POST'])
+def remove_item():
+    item_id = request.json.get('id')
+    for i, item in enumerate(cart_state["cart_items"]):
+        if item["id"] == item_id:
+            cart_state["total"] -= item["preco"]
+            cart_state["cart_items"].pop(i)
+            break
+    return jsonify({"success": True})
+
+@app.route('/api/move', methods=['POST'])
+def move_cart():
+    d = request.json.get('direction')
+    keys = {"UP": d=="up", "DOWN": d=="down", "LEFT": d=="left", "RIGHT": d=="right"}
+    engine.update_manual(keys)
+    return jsonify({"status": "moved"})
+
+@app.route('/api/toggle_theme', methods=['POST'])
+def toggle_theme():
+    cart_state["theme"] = "red" if cart_state["theme"] == "green" else "green"
+    return jsonify({"theme": cart_state["theme"]})
+
+@app.route('/api/mapa')
+def get_map_data():
+    return jsonify({"grid": engine.grid, "width": engine.grid_w, "height": engine.grid_h, "tile_size": 30})
+
+if __name__ == '__main__':
+    Thread(target=start_tunnel).start()
+    app.run(debug=True, host='0.0.0.0', port=5000, threaded=True)
+
+
+========== ARQUIVO: database.json ==========
+{
+  "users": {
+    "admin": {
+      "nome": "Administrador do Sistema",
+      "tipo": "admin"
+    },
+    "00000000000": {
+      "nome": "Cliente Teste",
+      "tipo": "cliente"
+    },
+    "04645036041": {
+      "nome": "Jyan da Silva Jagielo",
+      "tipo": "cliente",
+      "cpf_display": "04645036041"
+    },
+    "12345678900": {
+      "nome": "Testador",
+      "tipo": "Funcionário - OP CAIXA (Mat: 1111111)"
+    },
+    "03873163020": {
+      "nome": "Luisa Fonseca Rodrigues",
+      "tipo": "Funcionário - OP CAIXA (Mat: 260066)"
+    }
+  },
+  "products": [
+    {
+      "nome": "Arroz Tio João 5kg",
+      "preco": 28.9,
+      "icon": "inventory_2"
+    },
+    {
+      "nome": "Feijão Preto 1kg",
+      "preco": 8.5,
+      "icon": "grain"
+    },
+    {
+      "nome": "Azeite Gallo 500ml",
+      "preco": 42.0,
+      "icon": "water_drop"
+    },
+    {
+      "nome": "Coca-Cola 2L",
+      "preco": 9.99,
+      "icon": "local_drink"
+    },
+    {
+      "nome": "Picanha Maturada (kg)",
+      "preco": 69.9,
+      "icon": "restaurant"
+    },
+    {
+      "nome": "Cerveja Heineken",
+      "preco": 5.49,
+      "icon": "sports_bar"
+    },
+    {
+      "nome": "Leite Integral",
+      "preco": 4.59,
+      "icon": "water"
+    },
+    {
+      "nome": "Chocolate Lacta",
+      "preco": 6.99,
+      "icon": "cookie"
+    }
+  ]
+}
+
+
+========== ARQUIVO: empacotarIA.py ==========
+import os
+
+# --- CONFIGURAÇÕES ---
+# Nome do arquivo final
+OUTPUT_FILENAME = "PROJETO_COMPLETO_CONTEXTO.txt"
+
+# Pastas que a gente NÃO quer ler (Lixo e configs)
+IGNORE_DIRS = {
+    'venv', 'venv_btcar', '__pycache__', '.git', '.idea', '.vscode', 'build', 'dist', 'node_modules'
+}
+
+# Tipos de arquivos que a gente QUER ler
+INCLUDE_EXTS = {'.py', '.html', '.css', '.js', '.json', '.md', '.txt'}
+
+# Arquivos específicos para ignorar
+IGNORE_FILES = {
+    OUTPUT_FILENAME,     # Não ler o próprio arquivo que estamos criando
+    'empacotador.py',    # Não precisa ler este script
+    'package-lock.json', # Geralmente é muito grande e inútil pra lógica
+    '.DS_Store',
+    'Thumbs.db'
+}
+
+def is_text_file(filepath):
+    """Verifica pela extensão se é um arquivo de texto válido"""
+    return any(filepath.endswith(ext) for ext in INCLUDE_EXTS)
+
+def pack_project():
+    print(f"📦 Iniciando empacotamento do projeto...")
+
+    total_files = 0
+
+    with open(OUTPUT_FILENAME, 'w', encoding='utf-8') as out:
+        # Cabeçalho para a IA entender o contexto
+        out.write("--- INICIO DO CONTEXTO DO PROJETO ---\n")
+        out.write("Este arquivo contem todos os codigos fontes concatenados.\n")
+        out.write("Formato:\n")
+        out.write("=== ARQUIVO: [caminho] ===\n")
+        out.write("[conteudo]\n\n")
+
+        # Caminha por todas as pastas
+        for root, dirs, files in os.walk("."):
+            # Remove pastas ignoradas da busca (modifica a lista dirs in-place)
+            dirs[:] = [d for d in dirs if d not in IGNORE_DIRS]
+
+            for file in files:
+                if file in IGNORE_FILES:
+                    continue
+
+                if not is_text_file(file):
+                    continue
+
+                filepath = os.path.join(root, file)
+
+                # Normaliza o caminho para barras normais (melhor pra IA ler)
+                clean_path = filepath.replace("\\", "/")
+                if clean_path.startswith("./"):
+                    clean_path = clean_path[2:]
+
+                try:
+                    with open(filepath, 'r', encoding='utf-8', errors='ignore') as f:
+                        content = f.read()
+
+                        # ESCREVE NO FORMATO OTIMIZADO
+                        out.write(f"\n{'='*10} ARQUIVO: {clean_path} {'='*10}\n")
+                        out.write(content)
+                        out.write(f"\n\n")
+
+                        print(f"✅ Adicionado: {clean_path}")
+                        total_files += 1
+
+                except Exception as e:
+                    print(f"❌ Erro ao ler {clean_path}: {e}")
+
+        out.write("\n--- FIM DO CONTEXTO DO PROJETO ---\n")
+
+    print(f"\n✨ Sucesso! {total_files} arquivos empacotados em '{OUTPUT_FILENAME}'.")
+    print("👉 Agora basta arrastar esse arquivo txt para o chat.")
+
+if __name__ == "__main__":
+    pack_project()
+
+
+========== ARQUIVO: gps_engine.py ==========
+import pygame
+import json
+import math
+
+# Configurações do Motor Físico
+TILE_SIZE = 30
+COLOR_WALL = (60, 60, 60)
+COLOR_FLOOR = (230, 230, 230)
+COLOR_BEACON = (0, 150, 255)
+COLOR_PLAYER = (255, 50, 50)
+
+# Backend Simulado
+DB_PROMOCOES = {
+    0: {"setor": "Corredor Geral", "oferta": "Bem-vindo ao Bistek!"},
+    1: {"setor": "Adega & Destilados", "oferta": " Vinhos Chilenos - 2ª unidade com 50% OFF"},
+    2: {"setor": "Bebidas Geladas", "oferta": " Água da Pedra - 12 un por R$ 19,90"},
+    3: {"setor": "Bazar", "oferta": " Taças VDRID com 30% OFF"},
+    4: {"setor": "Laticínios", "oferta": " Leite Desnatado - 20% OFF"},
+    5: {"setor": "Pets", "oferta": " Whiskas Sachê - Leve 3 Pague 2"},
+    6: {"setor": "Padaria", "oferta": "Combo Café + Pão - R$ 19,90"},
+    7: {"setor": "Açougue", "oferta": "Picanha Maturada - R$ 49,90/kg"},
+    8: {"setor": "Higiene", "oferta": "Sabonetes - Leve 3 Pague 2"},
+    9: {"setor": "Limpeza", "oferta": "Veja 2L - 5% OFF (Clube)"},
+    10: {"setor": "Grãos", "oferta": "Feijão Namorados - 70% OFF"},
+    11: {"setor": "Hortifruti", "oferta": " Quarta Verde - 20% OFF"},
+    12: {"setor": "Floricultura", "oferta": " Sem ofertas hoje."},
+}
+
+class GPSEngine:
+    def __init__(self):
+        self.load_map()
+        self.scan_beacons()
+
+        # Player Setup
+        self.player_rect = pygame.Rect(0, 0, 20, 20)
+        start_pos = self.find_start_pos()
+        self.player_rect.center = start_pos
+        self.player_speed = 5
+
+        # Estado
+        self.current_zone_id = 0
+        self.connected_beacon = False
+        self.signal_radius = 4 * TILE_SIZE
+        self.walls = []
+        self.build_walls()
+    def update_manual(self, keys_dict):
+        """
+        Versão do update que aceita um dicionário simples em vez de pygame.key.get_pressed()
+        keys_dict espera: {"UP": bool, "DOWN": bool, "LEFT": bool, "RIGHT": bool}
+        """
+        mx, my = 0, 0
+
+        # A velocidade aqui pode ser ajustada. Como o celular manda um pulso,
+        # talvez seja bom mover um pouco mais por clique (ex: self.player_speed * 2)
+        speed = self.player_speed * 1 # Aumentei para ficar mais responsivo no toque
+
+        if keys_dict.get("UP"): my = -speed
+        if keys_dict.get("DOWN"): my = speed
+        if keys_dict.get("LEFT"): mx = -speed
+        if keys_dict.get("RIGHT"): mx = speed
+
+        # Lógica de Movimento e Colisão (Idêntica ao update original)
+        if mx != 0:
+            test_rect = self.player_rect.move(mx, 0)
+            if not self.check_collision(test_rect): self.player_rect.move_ip(mx, 0)
+        if my != 0:
+            test_rect = self.player_rect.move(0, my)
+            if not self.check_collision(test_rect): self.player_rect.move_ip(0, my)
+
+        # Atualiza Sensores (Beacons e Zonas)
+        px, py = self.player_rect.center
+
+        # 1. Beacon Check
+        near_beacon = False
+        for bx, by in self.beacons:
+            dist = math.hypot(bx-px, by-py)
+            if dist < self.signal_radius:
+                if self.raycast((px, py), (bx, by)):
+                    near_beacon = True
+                    break
+        self.connected_beacon = near_beacon
+
+        # 2. Zone Check
+        gx, gy = int(px // TILE_SIZE), int(py // TILE_SIZE)
+        if 0 <= gx < self.grid_w and 0 <= gy < self.grid_h:
+            self.current_zone_id = self.grid[gx][gy].get("zone_id", 0)
+    def load_map(self):
+        try:
+            fname = "loja_mapa_v3.json"
+            try:
+                f = open(fname, "r")
+            except:
+                f = open("loja_mapa.json", "r")
+            data = json.load(f)
+            self.grid = data["grid"]
+            self.grid_w = data["dimensions"]["width"]
+            self.grid_h = data["dimensions"]["height"]
+            f.close()
+        except Exception as e:
+            print(f"Erro GPS: {e}")
+            self.grid = []
+
+    def scan_beacons(self):
+        self.beacons = []
+        for x in range(self.grid_w):
+            for y in range(self.grid_h):
+                if self.grid[x][y].get("type") == 3:
+                    cx = x * TILE_SIZE + TILE_SIZE // 2
+                    cy = y * TILE_SIZE + TILE_SIZE // 2
+                    self.beacons.append((cx, cy))
+
+    def find_start_pos(self):
+        for x in range(self.grid_w):
+            for y in range(self.grid_h):
+                if self.grid[x][y].get("type") == 2:
+                    return (x * TILE_SIZE + TILE_SIZE//2, y * TILE_SIZE + TILE_SIZE//2)
+        return (100, 100)
+
+    def build_walls(self):
+        self.walls = []
+        for x in range(self.grid_w):
+            for y in range(self.grid_h):
+                t = self.grid[x][y].get("type")
+                if t == 1 or t == 3:
+                    self.walls.append(pygame.Rect(x*TILE_SIZE, y*TILE_SIZE, TILE_SIZE, TILE_SIZE))
+
+    def check_collision(self, rect):
+        for wall in self.walls:
+            if rect.colliderect(wall): return True
+        return False
+
+    def raycast(self, start, end):
+        x1, y1 = start
+        x2, y2 = end
+        dist = math.hypot(x2-x1, y2-y1)
+        if dist == 0: return True
+        steps = int(dist / (TILE_SIZE/2))
+        for i in range(steps):
+            t = i / steps
+            px = x1 + (x2-x1)*t
+            py = y1 + (y2-y1)*t
+            gx, gy = int(px//TILE_SIZE), int(py//TILE_SIZE)
+            if 0 <= gx < self.grid_w and 0 <= gy < self.grid_h:
+                if self.grid[gx][gy].get("type") == 1:
+                    return False
+        return True
+
+    def update(self, keys):
+        # Movimentação baseada nas teclas passadas pela UI
+        mx, my = 0, 0
+        if keys[pygame.K_w] or keys[pygame.K_UP]: my = -self.player_speed
+        if keys[pygame.K_s] or keys[pygame.K_DOWN]: my = self.player_speed
+        if keys[pygame.K_a] or keys[pygame.K_LEFT]: mx = -self.player_speed
+        if keys[pygame.K_d] or keys[pygame.K_RIGHT]: mx = self.player_speed
+
+        if mx != 0:
+            test_rect = self.player_rect.move(mx, 0)
+            if not self.check_collision(test_rect): self.player_rect.move_ip(mx, 0)
+        if my != 0:
+            test_rect = self.player_rect.move(0, my)
+            if not self.check_collision(test_rect): self.player_rect.move_ip(0, my)
+
+        # Lógica de Sensores
+        px, py = self.player_rect.center
+
+        # Beacon Check
+        near_beacon = False
+        for bx, by in self.beacons:
+            dist = math.hypot(bx-px, by-py)
+            if dist < self.signal_radius:
+                if self.raycast((px, py), (bx, by)):
+                    near_beacon = True
+                    break
+        self.connected_beacon = near_beacon
+
+        # Zone Check
+        gx, gy = int(px // TILE_SIZE), int(py // TILE_SIZE)
+        if 0 <= gx < self.grid_w and 0 <= gy < self.grid_h:
+            self.current_zone_id = self.grid[gx][gy].get("zone_id", 0)
+
+    def get_info(self):
+        """Retorna as informações para a UI exibir"""
+        if self.connected_beacon and self.current_zone_id > 0:
+            return DB_PROMOCOES.get(self.current_zone_id, DB_PROMOCOES[0])
+        elif self.connected_beacon:
+            return {"setor": "Corredor", "oferta": "Navegue para ver ofertas."}
+        else:
+            return {"setor": "Sem Sinal", "oferta": "Procurando conexão..."}
+
+    def render_map_surface(self):
+        """Desenha o mapa numa 'foto' para a UI usar como Mini-mapa"""
+        w, h = self.grid_w * TILE_SIZE, self.grid_h * TILE_SIZE
+        surf = pygame.Surface((w, h))
+        surf.fill((30, 30, 30))
+
+        for x in range(self.grid_w):
+            for y in range(self.grid_h):
+                cell = self.grid[x][y]
+                rect = pygame.Rect(x*TILE_SIZE, y*TILE_SIZE, TILE_SIZE, TILE_SIZE)
+
+                if cell.get("type") == 1: pygame.draw.rect(surf, COLOR_WALL, rect)
+                elif cell.get("type") == 2: pygame.draw.rect(surf, COLOR_FLOOR, rect)
+                elif cell.get("type") == 3:
+                    pygame.draw.rect(surf, COLOR_WALL, rect)
+                    pygame.draw.circle(surf, COLOR_BEACON, rect.center, 5)
+
+                if cell.get("zone_id", 0) > 0:
+                    s = pygame.Surface((TILE_SIZE, TILE_SIZE), pygame.SRCALPHA)
+                    s.fill((148, 0, 211, 50))
+                    surf.blit(s, (x*TILE_SIZE, y*TILE_SIZE))
+
+        # Desenha Player
+        pygame.draw.circle(surf, COLOR_PLAYER, self.player_rect.center, 8)
+
+        return surf
+
+
+========== ARQUIVO: loja_mapa_v3.json ==========
+{"dimensions": {"width": 30, "height": 18}, "tile_size": 40, "grid": [[{"type": 1, "zone_id": 1}, {"type": 1, "zone_id": 1}, {"type": 1, "zone_id": 1}, {"type": 1, "zone_id": 1}, {"type": 1, "zone_id": 1}, {"type": 1, "zone_id": 1}, {"type": 1, "zone_id": 1}, {"type": 1, "zone_id": 1}, {"type": 1, "zone_id": 1}, {"type": 1, "zone_id": 1}, {"type": 1, "zone_id": 1}, {"type": 1, "zone_id": 1}, {"type": 1, "zone_id": 0}, {"type": 1, "zone_id": 0}, {"type": 1, "zone_id": 0}, {"type": 3, "zone_id": 0}, {"type": 1, "zone_id": 0}, {"type": 1, "zone_id": 0}], [{"type": 1, "zone_id": 1}, {"type": 2, "zone_id": 1}, {"type": 2, "zone_id": 1}, {"type": 2, "zone_id": 1}, {"type": 2, "zone_id": 1}, {"type": 2, "zone_id": 1}, {"type": 2, "zone_id": 1}, {"type": 2, "zone_id": 1}, {"type": 2, "zone_id": 1}, {"type": 2, "zone_id": 1}, {"type": 2, "zone_id": 1}, {"type": 2, "zone_id": 1}, {"type": 1, "zone_id": 0}, {"type": 2, "zone_id": 12}, {"type": 2, "zone_id": 12}, {"type": 2, "zone_id": 12}, {"type": 2, "zone_id": 12}, {"type": 1, "zone_id": 0}], [{"type": 1, "zone_id": 1}, {"type": 2, "zone_id": 1}, {"type": 2, "zone_id": 1}, {"type": 2, "zone_id": 1}, {"type": 2, "zone_id": 1}, {"type": 2, "zone_id": 1}, {"type": 2, "zone_id": 1}, {"type": 2, "zone_id": 1}, {"type": 2, "zone_id": 1}, {"type": 2, "zone_id": 1}, {"type": 2, "zone_id": 1}, {"type": 2, "zone_id": 1}, {"type": 1, "zone_id": 0}, {"type": 2, "zone_id": 12}, {"type": 2, "zone_id": 12}, {"type": 2, "zone_id": 12}, {"type": 2, "zone_id": 12}, {"type": 3, "zone_id": 0}], [{"type": 1, "zone_id": 1}, {"type": 2, "zone_id": 1}, {"type": 3, "zone_id": 1}, {"type": 1, "zone_id": 1}, {"type": 1, "zone_id": 1}, {"type": 3, "zone_id": 1}, {"type": 1, "zone_id": 1}, {"type": 1, "zone_id": 1}, {"type": 3, "zone_id": 1}, {"type": 2, "zone_id": 1}, {"type": 2, "zone_id": 1}, {"type": 2, "zone_id": 1}, {"type": 1, "zone_id": 0}, {"type": 2, "zone_id": 12}, {"type": 2, "zone_id": 12}, {"type": 2, "zone_id": 12}, {"type": 2, "zone_id": 12}, {"type": 2, "zone_id": 0}], [{"type": 1, "zone_id": 1}, {"type": 2, "zone_id": 1}, {"type": 2, "zone_id": 1}, {"type": 2, "zone_id": 1}, {"type": 2, "zone_id": 1}, {"type": 2, "zone_id": 1}, {"type": 2, "zone_id": 1}, {"type": 2, "zone_id": 1}, {"type": 2, "zone_id": 1}, {"type": 2, "zone_id": 1}, {"type": 2, "zone_id": 1}, {"type": 2, "zone_id": 1}, {"type": 1, "zone_id": 0}, {"type": 2, "zone_id": 12}, {"type": 2, "zone_id": 12}, {"type": 2, "zone_id": 12}, {"type": 2, "zone_id": 12}, {"type": 2, "zone_id": 0}], [{"type": 1, "zone_id": 1}, {"type": 2, "zone_id": 1}, {"type": 3, "zone_id": 1}, {"type": 1, "zone_id": 1}, {"type": 1, "zone_id": 1}, {"type": 3, "zone_id": 1}, {"type": 1, "zone_id": 1}, {"type": 1, "zone_id": 1}, {"type": 3, "zone_id": 1}, {"type": 2, "zone_id": 1}, {"type": 2, "zone_id": 1}, {"type": 2, "zone_id": 1}, {"type": 1, "zone_id": 0}, {"type": 1, "zone_id": 0}, {"type": 3, "zone_id": 0}, {"type": 2, "zone_id": 12}, {"type": 2, "zone_id": 12}, {"type": 2, "zone_id": 0}], [{"type": 1, "zone_id": 1}, {"type": 2, "zone_id": 1}, {"type": 2, "zone_id": 1}, {"type": 2, "zone_id": 1}, {"type": 2, "zone_id": 1}, {"type": 2, "zone_id": 1}, {"type": 2, "zone_id": 1}, {"type": 2, "zone_id": 1}, {"type": 2, "zone_id": 1}, {"type": 2, "zone_id": 1}, {"type": 2, "zone_id": 1}, {"type": 2, "zone_id": 1}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}], [{"type": 1, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}], [{"type": 1, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 1, "zone_id": 0}], [{"type": 1, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 3, "zone_id": 0}, {"type": 1, "zone_id": 0}, {"type": 3, "zone_id": 0}, {"type": 1, "zone_id": 0}, {"type": 3, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 3, "zone_id": 0}, {"type": 1, "zone_id": 0}, {"type": 3, "zone_id": 0}, {"type": 1, "zone_id": 0}, {"type": 3, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 1, "zone_id": 0}], [{"type": 1, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 2}, {"type": 2, "zone_id": 2}, {"type": 2, "zone_id": 2}, {"type": 2, "zone_id": 2}, {"type": 2, "zone_id": 2}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 11}, {"type": 2, "zone_id": 11}, {"type": 2, "zone_id": 11}, {"type": 2, "zone_id": 11}, {"type": 2, "zone_id": 11}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 1, "zone_id": 0}], [{"type": 1, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 2}, {"type": 2, "zone_id": 2}, {"type": 2, "zone_id": 2}, {"type": 2, "zone_id": 2}, {"type": 2, "zone_id": 2}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 11}, {"type": 2, "zone_id": 11}, {"type": 2, "zone_id": 11}, {"type": 2, "zone_id": 11}, {"type": 2, "zone_id": 11}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 1, "zone_id": 0}], [{"type": 1, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 3, "zone_id": 0}, {"type": 1, "zone_id": 0}, {"type": 3, "zone_id": 0}, {"type": 1, "zone_id": 0}, {"type": 3, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 3, "zone_id": 0}, {"type": 1, "zone_id": 0}, {"type": 3, "zone_id": 0}, {"type": 1, "zone_id": 0}, {"type": 3, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 1, "zone_id": 0}], [{"type": 1, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 3}, {"type": 2, "zone_id": 3}, {"type": 2, "zone_id": 3}, {"type": 2, "zone_id": 3}, {"type": 2, "zone_id": 3}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 10}, {"type": 2, "zone_id": 10}, {"type": 2, "zone_id": 10}, {"type": 2, "zone_id": 10}, {"type": 2, "zone_id": 10}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 1, "zone_id": 0}], [{"type": 1, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 3}, {"type": 2, "zone_id": 3}, {"type": 2, "zone_id": 3}, {"type": 2, "zone_id": 3}, {"type": 2, "zone_id": 3}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 10}, {"type": 2, "zone_id": 10}, {"type": 2, "zone_id": 10}, {"type": 2, "zone_id": 10}, {"type": 2, "zone_id": 10}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 1, "zone_id": 0}], [{"type": 1, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 3, "zone_id": 0}, {"type": 1, "zone_id": 0}, {"type": 3, "zone_id": 0}, {"type": 1, "zone_id": 0}, {"type": 3, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 3, "zone_id": 0}, {"type": 1, "zone_id": 0}, {"type": 3, "zone_id": 0}, {"type": 1, "zone_id": 0}, {"type": 3, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 1, "zone_id": 0}], [{"type": 1, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 4}, {"type": 2, "zone_id": 4}, {"type": 2, "zone_id": 4}, {"type": 2, "zone_id": 4}, {"type": 2, "zone_id": 4}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 9}, {"type": 2, "zone_id": 9}, {"type": 2, "zone_id": 9}, {"type": 2, "zone_id": 9}, {"type": 2, "zone_id": 9}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 1, "zone_id": 0}], [{"type": 1, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 4}, {"type": 2, "zone_id": 4}, {"type": 2, "zone_id": 4}, {"type": 2, "zone_id": 4}, {"type": 2, "zone_id": 4}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 9}, {"type": 2, "zone_id": 9}, {"type": 2, "zone_id": 9}, {"type": 2, "zone_id": 9}, {"type": 2, "zone_id": 9}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 1, "zone_id": 0}], [{"type": 1, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 3, "zone_id": 0}, {"type": 1, "zone_id": 0}, {"type": 3, "zone_id": 0}, {"type": 1, "zone_id": 0}, {"type": 3, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 3, "zone_id": 0}, {"type": 1, "zone_id": 0}, {"type": 3, "zone_id": 0}, {"type": 1, "zone_id": 0}, {"type": 3, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 1, "zone_id": 0}], [{"type": 1, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 5}, {"type": 2, "zone_id": 5}, {"type": 2, "zone_id": 5}, {"type": 2, "zone_id": 5}, {"type": 2, "zone_id": 5}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 8}, {"type": 2, "zone_id": 8}, {"type": 2, "zone_id": 8}, {"type": 2, "zone_id": 8}, {"type": 2, "zone_id": 8}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 1, "zone_id": 0}], [{"type": 1, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 5}, {"type": 2, "zone_id": 5}, {"type": 2, "zone_id": 5}, {"type": 2, "zone_id": 5}, {"type": 2, "zone_id": 5}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 8}, {"type": 2, "zone_id": 8}, {"type": 2, "zone_id": 8}, {"type": 2, "zone_id": 8}, {"type": 2, "zone_id": 8}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 1, "zone_id": 0}], [{"type": 1, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 3, "zone_id": 0}, {"type": 1, "zone_id": 0}, {"type": 3, "zone_id": 0}, {"type": 1, "zone_id": 0}, {"type": 3, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 3, "zone_id": 0}, {"type": 1, "zone_id": 0}, {"type": 3, "zone_id": 0}, {"type": 1, "zone_id": 0}, {"type": 3, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 1, "zone_id": 0}], [{"type": 1, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 6}, {"type": 2, "zone_id": 6}, {"type": 2, "zone_id": 6}, {"type": 2, "zone_id": 6}, {"type": 2, "zone_id": 6}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 7}, {"type": 2, "zone_id": 7}, {"type": 2, "zone_id": 7}, {"type": 2, "zone_id": 7}, {"type": 2, "zone_id": 7}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}], [{"type": 1, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 6}, {"type": 2, "zone_id": 6}, {"type": 2, "zone_id": 6}, {"type": 2, "zone_id": 6}, {"type": 2, "zone_id": 6}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 7}, {"type": 2, "zone_id": 7}, {"type": 2, "zone_id": 7}, {"type": 2, "zone_id": 7}, {"type": 2, "zone_id": 7}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}], [{"type": 1, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 3, "zone_id": 0}, {"type": 1, "zone_id": 0}, {"type": 3, "zone_id": 0}, {"type": 1, "zone_id": 0}, {"type": 3, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 3, "zone_id": 0}, {"type": 1, "zone_id": 0}, {"type": 3, "zone_id": 0}, {"type": 1, "zone_id": 0}, {"type": 3, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}], [{"type": 1, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}], [{"type": 1, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}], [{"type": 1, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 1, "zone_id": 0}], [{"type": 1, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 1, "zone_id": 0}], [{"type": 1, "zone_id": 0}, {"type": 1, "zone_id": 0}, {"type": 1, "zone_id": 0}, {"type": 1, "zone_id": 0}, {"type": 1, "zone_id": 0}, {"type": 1, "zone_id": 0}, {"type": 1, "zone_id": 0}, {"type": 1, "zone_id": 0}, {"type": 1, "zone_id": 0}, {"type": 1, "zone_id": 0}, {"type": 1, "zone_id": 0}, {"type": 1, "zone_id": 0}, {"type": 1, "zone_id": 0}, {"type": 1, "zone_id": 0}, {"type": 1, "zone_id": 0}, {"type": 1, "zone_id": 0}, {"type": 1, "zone_id": 0}, {"type": 1, "zone_id": 0}]]}
+
+
+========== ARQUIVO: main_tablet.py ==========
+import pygame
+import sys
+import datetime
+from gps_engine import GPSEngine
+
+# --- CONFIGURAÇÕES DE UI ---
+SCREEN_WIDTH = 1250
+SCREEN_HEIGHT = 650
+COLOR_BG = (240, 240, 240)
+COLOR_HEADER = (255, 255, 255)
+COLOR_TEXT_DARK = (50, 50, 50)
+COLOR_ACCENT = (200, 50, 50) # Vermelho Bistek
+COLOR_BTN = (0, 150, 0)
+
+# Estados da Aplicação
+STATE_LOGIN = 1
+STATE_DASHBOARD = 2
+
+# Lista de Compras Mockada
+SHOPPING_LIST = [
+    {"item": "Arroz Tio João 5kg", "qtd": 1, "price": 28.90},
+    {"item": "Feijão Preto 1kg", "qtd": 2, "price": 8.50},
+    {"item": "Azeite Gallo 500ml", "qtd": 1, "price": 42.00},
+    {"item": "Coca-Cola 2L", "qtd": 3, "price": 9.99},
+    {"item": "Sabão em Pó Omo", "qtd": 1, "price": 35.90},
+    {"item": "Leite Integral CX", "qtd": 12, "price": 4.59},
+]
+
+class SmartCartUI:
+    def __init__(self):
+        pygame.init()
+        self.screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
+        pygame.display.set_caption("Bistek Tablet OS v1.0")
+        self.clock = pygame.time.Clock()
+
+        # Fontes
+        self.font_big = pygame.font.SysFont("Arial", 28, bold=True)
+        self.font_med = pygame.font.SysFont("Arial", 20)
+        self.font_small = pygame.font.SysFont("Arial", 16)
+
+        # Inicializa GPS Engine
+        self.gps = GPSEngine()
+
+        # Variáveis de Estado
+        self.state = STATE_LOGIN
+        self.user_name = ""
+        self.input_cpf = ""
+        self.map_expanded = False
+
+        # Layout Rects
+        self.btn_aux_rect = pygame.Rect(SCREEN_WIDTH - 350, SCREEN_HEIGHT - 200, 330, 80)
+        self.minimap_rect = pygame.Rect(SCREEN_WIDTH - 220, 20, 200, 150) # Canto superior direito
+
+    def get_date_string(self):
+        now = datetime.datetime.now()
+        return now.strftime("%d/%m/%Y | %H:%M")
+
+    def draw_login(self):
+        self.screen.fill((200, 50, 50)) # Fundo Vermelho Bistek
+
+        # Box Central
+        center_x = SCREEN_WIDTH // 2
+        center_y = SCREEN_HEIGHT // 2
+        panel = pygame.Rect(center_x - 200, center_y - 150, 400, 300)
+        pygame.draw.rect(self.screen, (255, 255, 255), panel, border_radius=15)
+
+        # Título
+        title = self.font_big.render("CLUBE BISTEK", True, COLOR_ACCENT)
+        self.screen.blit(title, (center_x - title.get_width()//2, panel.y + 30))
+
+        # Input CPF
+        lbl = self.font_small.render("Digite seu CPF (ou 'admin'):", True, (100, 100, 100))
+        self.screen.blit(lbl, (panel.x + 40, panel.y + 100))
+
+        # Caixa de Texto
+        pygame.draw.rect(self.screen, (230, 230, 230), (panel.x + 40, panel.y + 130, 320, 40), border_radius=5)
+        txt_surf = self.font_med.render(self.input_cpf, True, (0, 0, 0))
+        self.screen.blit(txt_surf, (panel.x + 50, panel.y + 140))
+
+        # Botão Entrar
+        btn_rect = pygame.Rect(panel.x + 40, panel.y + 200, 320, 50)
+        pygame.draw.rect(self.screen, COLOR_BTN, btn_rect, border_radius=5)
+        btn_lbl = self.font_med.render("ACESSAR", True, (255, 255, 255))
+        self.screen.blit(btn_lbl, (center_x - btn_lbl.get_width()//2, btn_rect.y + 15))
+
+        # Instrução
+        hint = self.font_small.render("Pressione ENTER para confirmar", True, (150, 150, 150))
+        self.screen.blit(hint, (center_x - hint.get_width()//2, panel.bottom + 10))
+
+    def draw_dashboard(self):
+        self.screen.fill(COLOR_BG)
+
+        # --- COLUNA ESQUERDA: LISTA DE COMPRAS ---
+        list_width = SCREEN_WIDTH * 0.6
+        pygame.draw.rect(self.screen, (255, 255, 255), (20, 20, list_width, SCREEN_HEIGHT - 100), border_radius=10)
+
+        # Cabeçalho da Lista
+        headers = ["PRODUTO", "QTD", "UNIT (R$)", "TOTAL (R$)"]
+        x_positions = [40, 400, 500, 650]
+        for i, h in enumerate(headers):
+            surf = self.font_small.render(h, True, (150, 150, 150))
+            self.screen.blit(surf, (x_positions[i], 40))
+
+        pygame.draw.line(self.screen, (230, 230, 230), (20, 70), (20 + list_width, 70), 2)
+
+        # Itens
+        y_pos = 90
+        subtotal = 0
+        for item in SHOPPING_LIST:
+            total_item = item["qtd"] * item["price"]
+            subtotal += total_item
+
+            self.screen.blit(self.font_med.render(item["item"][:30], True, (0,0,0)), (x_positions[0], y_pos))
+            self.screen.blit(self.font_med.render(str(item["qtd"]), True, (0,0,0)), (x_positions[1], y_pos))
+            self.screen.blit(self.font_med.render(f"{item['price']:.2f}", True, (0,0,0)), (x_positions[2], y_pos))
+            self.screen.blit(self.font_med.render(f"{total_item:.2f}", True, (0,0,0)), (x_positions[3], y_pos))
+            y_pos += 40
+
+        # Subtotal
+        pygame.draw.rect(self.screen, (240, 240, 240), (20, SCREEN_HEIGHT - 180, list_width, 80), border_radius=0)
+        lbl_sub = self.font_big.render("SUBTOTAL:", True, COLOR_ACCENT)
+        val_sub = self.font_big.render(f"R$ {subtotal:.2f}", True, COLOR_ACCENT)
+        self.screen.blit(lbl_sub, (40, SCREEN_HEIGHT - 150))
+        self.screen.blit(val_sub, (list_width - 200, SCREEN_HEIGHT - 150))
+
+        # --- COLUNA DIREITA: GPS & INFO ---
+        # Oferta Dinâmica
+        gps_info = self.gps.get_info()
+
+        offer_rect = pygame.Rect(list_width + 40, 200, 420, 200)
+        pygame.draw.rect(self.screen, (255, 255, 220), offer_rect, border_radius=10)
+        pygame.draw.rect(self.screen, (200, 150, 0), offer_rect, 2, border_radius=10)
+
+        # Texto da Oferta
+        lbl_loc = self.font_small.render(" LOCALIZAÇÃO ATUAL:", True, (100, 100, 100))
+        self.screen.blit(lbl_loc, (offer_rect.x + 20, offer_rect.y + 20))
+
+        txt_setor = self.font_big.render(gps_info["setor"], True, (0, 0, 0))
+        self.screen.blit(txt_setor, (offer_rect.x + 20, offer_rect.y + 45))
+
+        # Quebra de linha da oferta
+        words = gps_info["oferta"].split(" ")
+        line = ""
+        ty = offer_rect.y + 90
+        for word in words:
+            test = line + word + " "
+            if self.font_med.size(test)[0] < 380:
+                line = test
+            else:
+                self.screen.blit(self.font_med.render(line, True, COLOR_ACCENT), (offer_rect.x + 20, ty))
+                line = word + " "
+                ty += 25
+        self.screen.blit(self.font_med.render(line, True, COLOR_ACCENT), (offer_rect.x + 20, ty))
+
+        # Botão Auxiliares
+        pygame.draw.rect(self.screen, (100, 100, 200), self.btn_aux_rect, border_radius=10)
+        btn_txt = self.font_big.render(" Auxiliares", True, (255, 255, 255))
+        self.screen.blit(btn_txt, (self.btn_aux_rect.centerx - btn_txt.get_width()//2, self.btn_aux_rect.centery - 10))
+
+        # --- FOOTER ---
+        pygame.draw.rect(self.screen, (30, 30, 30), (0, SCREEN_HEIGHT - 60, SCREEN_WIDTH, 60))
+
+        # Info Cliente
+        cpf_mask = "***.***.***-**" if self.user_name != "Jyan S." else "000.000.000-00 (ADMIN)"
+        user_info = f"CLIENTE: {self.user_name}  |  CPF: {cpf_mask}"
+        surf_user = self.font_med.render(user_info, True, (200, 200, 200))
+        self.screen.blit(surf_user, (20, SCREEN_HEIGHT - 40))
+
+        # Info Loja
+        loja_info = f"{self.get_date_string()}  |  Aberto: 08:00 - 22:00"
+        surf_loja = self.font_med.render(loja_info, True, (200, 200, 200))
+        self.screen.blit(surf_loja, (SCREEN_WIDTH - surf_loja.get_width() - 20, SCREEN_HEIGHT - 40))
+
+        # --- MINIMAPA ---
+        # Pega a "foto" do motor GPS
+        raw_map = self.gps.render_map_surface()
+
+        if self.map_expanded:
+            # Modo Tela Cheia (Overlay)
+            overlay = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
+            overlay.fill((0, 0, 0, 180)) # Escurece o fundo
+            self.screen.blit(overlay, (0,0))
+
+            # Mapa Grande Centralizado
+            scale_w = SCREEN_WIDTH - 100
+            scale_h = SCREEN_HEIGHT - 100
+            scaled_map = pygame.transform.scale(raw_map, (scale_w, scale_h))
+            map_rect = scaled_map.get_rect(center=(SCREEN_WIDTH//2, SCREEN_HEIGHT//2))
+
+            # Moldura
+            pygame.draw.rect(self.screen, (255, 255, 255), map_rect.inflate(20, 20), border_radius=10)
+            self.screen.blit(scaled_map, map_rect)
+
+            hint = self.font_med.render("Clique para Minimizar", True, (0,0,0))
+            self.screen.blit(hint, (SCREEN_WIDTH//2 - hint.get_width()//2, map_rect.bottom + 15))
+
+            self.expanded_rect = map_rect # Salva para checar clique depois
+
+        else:
+            # Modo Canto (Widget)
+            scaled_map = pygame.transform.scale(raw_map, (self.minimap_rect.width, self.minimap_rect.height))
+
+            # Moldura e Sombra
+            shadow = pygame.Rect(self.minimap_rect.x+5, self.minimap_rect.y+5, self.minimap_rect.width, self.minimap_rect.height)
+            pygame.draw.rect(self.screen, (100, 100, 100), shadow, border_radius=10)
+            pygame.draw.rect(self.screen, (255, 255, 255), self.minimap_rect, border_radius=10)
+
+            # Clipando o mapa nas bordas arredondadas (truque visual simples: desenha por cima)
+            self.screen.blit(scaled_map, self.minimap_rect)
+            pygame.draw.rect(self.screen, (200, 50, 50), self.minimap_rect, 3, border_radius=10) # Borda
+
+            lbl_map = self.font_tag = pygame.font.SysFont("Arial", 12, bold=True).render("MAPA (Clique)", True, (255,255,255))
+            pygame.draw.rect(self.screen, (200, 50, 50), (self.minimap_rect.x, self.minimap_rect.bottom - 20, self.minimap_rect.width, 20), border_bottom_left_radius=10, border_bottom_right_radius=10)
+            self.screen.blit(lbl_map, (self.minimap_rect.centerx - lbl_map.get_width()//2, self.minimap_rect.bottom - 18))
+
+    def run(self):
+        while True:
+            # --- INPUT HANDLER ---
+            events = pygame.event.get()
+            for event in events:
+                if event.type == pygame.QUIT:
+                    pygame.quit()
+                    sys.exit()
+
+                # Input Login
+                if self.state == STATE_LOGIN:
+                    if event.type == pygame.KEYDOWN:
+                        if event.key == pygame.K_BACKSPACE:
+                            self.input_cpf = self.input_cpf[:-1]
+                        elif event.key == pygame.K_RETURN:
+                            # Lógica de Login
+                            if self.input_cpf.lower() == "admin":
+                                self.user_name = "Jyan S."
+                            else:
+                                self.user_name = "Cliente Clube"
+                            self.state = STATE_DASHBOARD
+                        else:
+                            if len(self.input_cpf) < 15:
+                                self.input_cpf += event.unicode
+
+                # Input Dashboard
+                elif self.state == STATE_DASHBOARD:
+                    if event.type == pygame.MOUSEBUTTONDOWN:
+                        mx, my = pygame.mouse.get_pos()
+
+                        if self.map_expanded:
+                            # Se clicar em qualquer lugar fecha
+                            self.map_expanded = False
+                        else:
+                            # Verifica clique no Minimapa
+                            if self.minimap_rect.collidepoint(mx, my):
+                                self.map_expanded = True
+
+                            # Verifica clique no Botão Auxiliar
+                            if self.btn_aux_rect.collidepoint(mx, my):
+                                print("Abrir menu auxiliar...") # Futuro popup
+
+            # --- UPDATE ---
+            if self.state == STATE_DASHBOARD:
+                # Passa o controle do teclado para o motor GPS mesmo desenhando a UI
+                keys = pygame.key.get_pressed()
+                self.gps.update(keys)
+
+            # --- DRAW ---
+            if self.state == STATE_LOGIN:
+                self.draw_login()
+            else:
+                self.draw_dashboard()
+
+            pygame.display.flip()
+            self.clock.tick(60)
+
+if __name__ == "__main__":
+    app = SmartCartUI()
+    app.run()
+
+
+========== ARQUIVO: mapa_build.py ==========
+import pygame
+import json
+import sys
+
+# --- CONFIGURAÇÕES ---
+SCREEN_WIDTH = 1200
+SCREEN_HEIGHT = 750 # Aumentei um pouco
+TILE_SIZE = 40
+GRID_WIDTH = SCREEN_WIDTH // TILE_SIZE
+GRID_HEIGHT = SCREEN_HEIGHT // TILE_SIZE
+
+# Cores
+COLOR_BG = (30, 30, 30)
+COLOR_GRID = (50, 50, 50)
+COLOR_WALL = (100, 100, 100)
+COLOR_FLOOR = (255, 255, 255)
+COLOR_BEACON = (0, 200, 255)
+COLOR_ZONE = (148, 0, 211, 100) # Roxo Translúcido (Alpha)
+COLOR_TEXT = (255, 255, 0)
+
+# Tipos
+TYPE_EMPTY = 0
+TYPE_WALL = 1
+TYPE_FLOOR = 2
+TYPE_BEACON = 3
+# Zonas são uma propriedade extra, não um tipo de bloco
+
+class MapBuilderV3:
+    def __init__(self):
+        pygame.init()
+        self.screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
+        pygame.display.set_caption("Bistek Map Builder V3 - Zone Painter")
+        self.clock = pygame.time.Clock()
+        self.font = pygame.font.SysFont("Arial", 16)
+
+        # Grid agora armazena o tipo E o ID da zona
+        self.grid = [[{"type": TYPE_EMPTY, "zone_id": 0} for _ in range(GRID_HEIGHT)] for _ in range(GRID_WIDTH)]
+
+        self.current_tool = TYPE_WALL
+        self.current_zone_id = 1
+        self.zone_history = [] # Para o CTRL+Z (armazena lista de celulas modificadas)
+        self.temp_cells = []   # Celulas sendo pintadas agora antes do ENTER
+        self.running = True
+
+    def draw_grid(self):
+        self.screen.fill(COLOR_BG)
+
+        for x in range(GRID_WIDTH):
+            for y in range(GRID_HEIGHT):
+                rect = pygame.Rect(x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE)
+                cell = self.grid[x][y]
+
+                # Desenha Tipos Base
+                if cell["type"] == TYPE_WALL:
+                    pygame.draw.rect(self.screen, COLOR_WALL, rect)
+                elif cell["type"] == TYPE_FLOOR:
+                    pygame.draw.rect(self.screen, COLOR_FLOOR, rect)
+                elif cell["type"] == TYPE_BEACON:
+                    pygame.draw.rect(self.screen, COLOR_BEACON, rect)
+                    pygame.draw.circle(self.screen, (255, 255, 255), rect.center, 5)
+
+                # Desenha Linhas
+                pygame.draw.rect(self.screen, COLOR_GRID, rect, 1)
+
+                # Desenha Zonas (Overlay Transparente)
+                if cell["zone_id"] > 0:
+                    s = pygame.Surface((TILE_SIZE, TILE_SIZE), pygame.SRCALPHA)
+                    s.fill(COLOR_ZONE)
+                    self.screen.blit(s, (x*TILE_SIZE, y*TILE_SIZE))
+                    # Mostra o número da zona pequeno
+                    num = self.font.render(str(cell["zone_id"]), True, (255, 255, 255))
+                    self.screen.blit(num, (x*TILE_SIZE+10, y*TILE_SIZE+10))
+
+        # Desenha células temporárias (antes do Enter)
+        for cx, cy in self.temp_cells:
+             s = pygame.Surface((TILE_SIZE, TILE_SIZE), pygame.SRCALPHA)
+             s.fill((255, 0, 255, 150)) # Roxo mais claro
+             self.screen.blit(s, (cx*TILE_SIZE, cy*TILE_SIZE))
+
+    def save_map(self):
+        filename = "loja_mapa_v3.json"
+        data = {
+            "dimensions": {"width": GRID_WIDTH, "height": GRID_HEIGHT},
+            "tile_size": TILE_SIZE,
+            "grid": self.grid
+        }
+        with open(filename, "w") as f:
+            json.dump(data, f)
+        print(f"✅ Mapa salvo com sucesso em: {filename}")
+
+    def undo_zone(self):
+        if self.zone_history:
+            last_batch = self.zone_history.pop()
+            # Reverte o ID da zona para 0 nessas células
+            for x, y in last_batch:
+                self.grid[x][y]["zone_id"] = 0
+            if self.current_zone_id > 1:
+                self.current_zone_id -= 1
+            print("↺ Desfeito última zona.")
+
+    def run(self):
+        while self.running:
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT: self.running = False
+
+                if event.type == pygame.KEYDOWN:
+                    if event.key == pygame.K_1: self.current_tool = TYPE_WALL
+                    if event.key == pygame.K_2: self.current_tool = TYPE_FLOOR
+                    if event.key == pygame.K_3: self.current_tool = TYPE_BEACON
+                    if event.key == pygame.K_4: self.current_tool = 4 # Modo Zona
+                    if event.key == pygame.K_s: self.save_map()
+
+                    # Confirmar Zona (ENTER)
+                    if event.key == pygame.K_RETURN and self.current_tool == 4:
+                        if self.temp_cells:
+                            # Comita as células temporárias para o grid
+                            committed = []
+                            for x, y in self.temp_cells:
+                                self.grid[x][y]["zone_id"] = self.current_zone_id
+                                committed.append((x, y))
+
+                            self.zone_history.append(committed)
+                            self.temp_cells = []
+                            self.current_zone_id += 1
+                            print(f"Zona {self.current_zone_id - 1} criada!")
+
+                    # Desfazer (CTRL + Z)
+                    if event.key == pygame.K_z and (pygame.key.get_mods() & pygame.KMOD_CTRL):
+                        self.undo_zone()
+
+            # Mouse Logic
+            if pygame.mouse.get_pressed()[0]:
+                mx, my = pygame.mouse.get_pos()
+                gx, gy = mx // TILE_SIZE, my // TILE_SIZE
+
+                if 0 <= gx < GRID_WIDTH and 0 <= gy < GRID_HEIGHT:
+                    # Se for ferramenta de construção normal
+                    if self.current_tool in [TYPE_WALL, TYPE_FLOOR, TYPE_BEACON]:
+                        self.grid[gx][gy]["type"] = self.current_tool
+                    # Se for ferramenta de ZONA
+                    elif self.current_tool == 4:
+                        if (gx, gy) not in self.temp_cells and self.grid[gx][gy]["zone_id"] == 0:
+                            self.temp_cells.append((gx, gy))
+
+            # Botão Direito (Apagar)
+            if pygame.mouse.get_pressed()[2]:
+                mx, my = pygame.mouse.get_pos()
+                gx, gy = mx // TILE_SIZE, my // TILE_SIZE
+                if 0 <= gx < GRID_WIDTH and 0 <= gy < GRID_HEIGHT:
+                    if self.current_tool == 4:
+                         if (gx, gy) in self.temp_cells: self.temp_cells.remove((gx, gy))
+                    else:
+                        self.grid[gx][gy]["type"] = TYPE_EMPTY
+                        self.grid[gx][gy]["zone_id"] = 0
+
+            self.draw_grid()
+
+            # HUD
+            tool_name = ["Vazio", "Parede", "Chão", "Beacon", f"ZONA #{self.current_zone_id} (Pinte e aperte ENTER)"][self.current_tool]
+            if self.current_tool == 4 and not self.temp_cells: tool_name += " - Aguardando pintura..."
+
+            text = self.font.render(f"Ferramenta: {tool_name} | S: Salvar | Ctrl+Z: Desfazer Zona", True, COLOR_TEXT)
+            self.screen.blit(text, (10, 10))
+            pygame.display.flip()
+            self.clock.tick(60)
+
+if __name__ == "__main__":
+    MapBuilderV3().run()
+
+
+========== ARQUIVO: README.md ==========
+# 🛒 Bistek Smart Cart - Indoor Location Engine (PoC)
+
+> **Protótipo de Software para Carrinhos Inteligentes com Geolocalização Indoor**
+> *Projeto de Inovação / Intraempreendedorismo - Desenvolvido por Jyan Jagielo*
+
+## 🎯 Objetivo do Projeto
+Este projeto é uma **Prova de Conceito (PoC)** desenvolvida para demonstrar a viabilidade técnica de um sistema de "Carrinho Inteligente" (Smart Cart) de baixo custo.
+
+O objetivo é solucionar dois grandes desafios do varejo físico:
+1.  **Melhorar a Experiência do Cliente (CX):** Oferecendo soma em tempo real e localização de produtos.
+2.  **Marketing Contextual:** Disparar ofertas baseadas na localização exata do cliente dentro da loja (ex: Oferta de vinhos ao entrar na Adega).
+
+## 💡 O Diferencial Técnico
+Diferente de soluções que exigem hardware caro ou GPS (que não funciona bem em locais fechados), este motor utiliza um **Algoritmo de Grade (Tilemap) + Beacons Virtuais**.
+
+O software simula a triangulação de sinal para identificar em qual corredor o cliente está, disparando eventos na interface do tablet acoplado ao carrinho.
+
+## 🛠️ Tecnologias Utilizadas
+* **Linguagem:** Python 3
+* **Engine Gráfica:** Pygame (para simulação física e renderização de UI)
+* **Estrutura de Dados:** JSON (armazenamento de mapas e layouts de loja)
+* **Arquitetura:** Separação completa entre *Backend Lógico* (Physics Engine) e *Frontend* (Tablet UI).
+
+## 📂 Estrutura do Projeto
+
+### 1. `mapa_build.py` (O Construtor)
+Uma ferramenta visual desenvolvida para desenhar o layout da loja.
+* Permite "pintar" paredes, corredores e posicionar Beacons.
+* Sistema de **Zonas de Gatilho**: O usuário define áreas lógicas (ex: Zona 3 = Padaria) e salva em JSON.
+* Funcionalidades: Save/Load, Undo (Ctrl+Z) e Grid System.
+
+### 2. `gps_engine.py` (O Motor Lógico)
+O "cérebro" do sistema que roda em background.
+* **Simulação de Sinal:** Calcula a distância entre o carrinho e os Beacons virtuais.
+* **Raycasting:** Verifica se há paredes bloqueando o sinal (visada direta).
+* **Triggers:** Cruza a posição (X, Y) do carrinho com o banco de dados de promoções.
+
+### 3. `main_tablet.py` (A Interface do Cliente)
+Simula a tela touch que o cliente veria no carrinho.
+* **Dashboard:** Lista de compras e subtotal em tempo real.
+* **Smart Alerts:** Pop-ups de ofertas que mudam automaticamente conforme o cliente "anda" pela loja virtual.
+* **Mini-Mapa:** Visualização em tempo real da posição na loja.
+
+## 🚀 Como Executar
+
+### Pré-requisitos
+Ter o Python instalado e a biblioteca Pygame:
+```bash
+pip install pygame
+```
+### Passo 1: Criar o Mapa (Opcional)
+Se quiser desenhar sua própria loja:
+```bash
+python mapa_build.py
+```
+Use o mouse para desenhar e ENTER para confirmar zonas. Pressione 'S' para salvar o loja_mapa_v3.json.
+
+### Passo 2: Rodar a Simulação
+Para iniciar o sistema do carrinho:
+
+```bash
+python main_tablet.py
+```
+### Controles:
+Use as setas do teclado (ou WASD) para mover o "carrinho" pela loja e veja a interface reagir às mudanças de corredor.
+
+### Login Admin: Digite admin no CPF para ver o modo debug.
+
+
+Desenvolvido com foco em inovação para o varejo.
+
+
+========== ARQUIVO: simulador_mapaBuild.py ==========
+import pygame
+import json
+import math
+import sys
+
+# --- CONFIGURAÇÕES ---
+WINDOW_WIDTH = 1250
+WINDOW_HEIGHT = 550
+SIDEBAR_WIDTH = 350
+TILE_SIZE = 30
+
+# Cores
+COLOR_BG = (20, 20, 20)
+COLOR_WALL = (60, 60, 60)
+COLOR_FLOOR = (230, 230, 230)
+COLOR_BEACON = (0, 150, 255)
+COLOR_PLAYER = (255, 50, 50)
+COLOR_ZONE_DEBUG = (148, 0, 211) # Roxo para debug (opcional)
+
+# --- BACKEND SIMULADO ---
+# Aqui você cadastra o que cada zona pintada representa
+DB_PROMOCOES = {
+    0: {"setor": "Corredor Geral", "oferta": "Bem-vindo ao Bistek!"},
+    1: {"setor": "Adega & Destilados", "oferta": "🍷 Vinhos Chilenos - 2ª unidade com 50% OFF"},
+    2: {"setor": "Bebidas geladas & quentes ", "oferta": "Água da pedra - 12ª unidades por R$ 19,90"},
+    3: {"setor": "Bazar", "oferta": "Taça e copos da marca VDRID com - 30% OFF"},
+    4: {"setor": "laticínios", "oferta": "Leite desnatado - Tudo com 20% OFF"},
+    5: {"setor": "Rações e pets", "oferta": "Leve 3 sachê pra gato, Pague 2"},
+    6: {"setor": "Padaria & Matinais", "oferta": "🍞 Pão de Forma + Café - Combo R$ 19,90"},
+    7: {"setor": "Açougue", "oferta": "🥩 Picanha Maturada - R$ 49,90/kg"},
+    8: {"setor": "Higiene", "oferta": "🧼 Leve 3 Sabonetes, Pague 2"},
+    9: {"setor": "Produtos de Limpeza", "oferta": "Veja 2L com 5% OFF pra clientes bistek clube"},
+    10: {"setor": "Grãos e Massas", "oferta": "Feijão namorados - 70% OFF"},
+    11: {"setor": "Hortifruti", "oferta": "🥦 Quarta Verde - Tudo com 20% OFF"},
+    12: {"setor": "Floricultura", "oferta": "Sem ofertas neste corredor!"},
+    # Adicione mais conforme você pintar (6, 7, 8...)
+}
+
+class SmartCartFinal:
+    def __init__(self):
+        pygame.init()
+        self.screen = pygame.display.set_mode((WINDOW_WIDTH, WINDOW_HEIGHT))
+        pygame.display.set_caption("Bistek Smart Cart - Final Logic")
+        self.clock = pygame.time.Clock()
+
+        self.font_title = pygame.font.SysFont("Verdana", 20, bold=True)
+        self.font_ui = pygame.font.SysFont("Verdana", 16)
+
+        self.load_map()
+        self.scan_beacons()
+
+        # Player Setup
+        self.player_rect = pygame.Rect(0, 0, 20, 20)
+        start_pos = self.find_start_pos()
+        self.player_rect.center = start_pos
+        self.player_speed = 5
+
+        # Lógica de Conexão
+        self.signal_radius = 4 * TILE_SIZE # 4 Metros
+        self.connected_beacon = None
+        self.current_zone_id = 0
+
+        # Margens Dinâmicas (Centralizar mapa na área esquerda)
+        map_view_w = WINDOW_WIDTH - SIDEBAR_WIDTH
+        self.offset_x = (map_view_w - (self.grid_w * TILE_SIZE)) // 2
+        self.offset_y = (WINDOW_HEIGHT - (self.grid_h * TILE_SIZE)) // 2
+
+        # Walls para colisão
+        self.walls = []
+        self.build_walls()
+
+    def load_map(self):
+        try:
+            # Tenta carregar a versão V3, se não tiver, tenta a V1
+            fname = "loja_mapa_v3.json"
+            try:
+                f = open(fname, "r")
+            except:
+                f = open("loja_mapa.json", "r")
+                print("Aviso: Usando mapa antigo. Use o MapBuilderV3 para zonas.")
+
+            data = json.load(f)
+            self.grid = data["grid"]
+            self.grid_w = data["dimensions"]["width"]
+            self.grid_h = data["dimensions"]["height"]
+            f.close()
+        except Exception as e:
+            print(f"Erro Crítico: {e}")
+            sys.exit()
+
+    def scan_beacons(self):
+        self.beacons = []
+        for x in range(self.grid_w):
+            for y in range(self.grid_h):
+                if self.grid[x][y].get("type") == 3: # TYPE_BEACON
+                    # Posição central absoluta
+                    cx = x * TILE_SIZE + TILE_SIZE // 2
+                    cy = y * TILE_SIZE + TILE_SIZE // 2
+                    self.beacons.append((cx, cy))
+
+    def find_start_pos(self):
+        for x in range(self.grid_w):
+            for y in range(self.grid_h):
+                if self.grid[x][y].get("type") == 2: # Floor
+                    return (x * TILE_SIZE + TILE_SIZE//2, y * TILE_SIZE + TILE_SIZE//2)
+        return (100, 100)
+
+    def build_walls(self):
+        self.walls = []
+        for x in range(self.grid_w):
+            for y in range(self.grid_h):
+                t = self.grid[x][y].get("type")
+                if t == 1 or t == 3: # Wall or Beacon
+                    self.walls.append(pygame.Rect(x*TILE_SIZE, y*TILE_SIZE, TILE_SIZE, TILE_SIZE))
+
+    def check_collision(self, rect):
+        for wall in self.walls:
+            if rect.colliderect(wall): return True
+        return False
+
+    def raycast(self, start, end):
+        # Raycast simples para validar visibilidade do Beacon
+        x1, y1 = start
+        x2, y2 = end
+        dist = math.hypot(x2-x1, y2-y1)
+        if dist == 0: return True
+        steps = int(dist / (TILE_SIZE/2))
+        for i in range(steps):
+            t = i / steps
+            px = x1 + (x2-x1)*t
+            py = y1 + (y2-y1)*t
+            gx, gy = int(px//TILE_SIZE), int(py//TILE_SIZE)
+            if 0 <= gx < self.grid_w and 0 <= gy < self.grid_h:
+                if self.grid[gx][gy].get("type") == 1: # Wall blocks signal
+                    return False
+        return True
+
+    def update(self):
+        # 1. Movimento WASD
+        keys = pygame.key.get_pressed()
+        mx, my = 0, 0
+        if keys[pygame.K_w] or keys[pygame.K_UP]: my = -self.player_speed
+        if keys[pygame.K_s] or keys[pygame.K_DOWN]: my = self.player_speed
+        if keys[pygame.K_a] or keys[pygame.K_LEFT]: mx = -self.player_speed
+        if keys[pygame.K_d] or keys[pygame.K_RIGHT]: mx = self.player_speed
+
+        # Colisão X
+        if mx != 0:
+            test_rect = self.player_rect.move(mx, 0)
+            if not self.check_collision(test_rect): self.player_rect.move_ip(mx, 0)
+        # Colisão Y
+        if my != 0:
+            test_rect = self.player_rect.move(0, my)
+            if not self.check_collision(test_rect): self.player_rect.move_ip(0, my)
+
+        # 2. Lógica de Localização Híbrida
+        px, py = self.player_rect.center
+
+        # A) Detectar Beacon (Hardware Trigger)
+        near_beacon = False
+        for bx, by in self.beacons:
+            dist = math.hypot(bx-px, by-py)
+            if dist < self.signal_radius:
+                if self.raycast((px, py), (bx, by)):
+                    near_beacon = True
+                    break
+        self.connected_beacon = near_beacon
+
+        # B) Detectar Zona do Piso (Software Logic)
+        gx, gy = int(px // TILE_SIZE), int(py // TILE_SIZE)
+        if 0 <= gx < self.grid_w and 0 <= gy < self.grid_h:
+            # Pega o ID da zona onde o jogador está pisando
+            z_id = self.grid[gx][gy].get("zone_id", 0)
+            self.current_zone_id = z_id
+
+    def draw(self):
+        self.screen.fill(COLOR_BG)
+
+        # --- MAPA ---
+        # Surface temporária para o mapa
+        map_surf = pygame.Surface((self.grid_w*TILE_SIZE, self.grid_h*TILE_SIZE))
+        map_surf.fill(COLOR_BG)
+
+        for x in range(self.grid_w):
+            for y in range(self.grid_h):
+                rect = pygame.Rect(x*TILE_SIZE, y*TILE_SIZE, TILE_SIZE, TILE_SIZE)
+                cell = self.grid[x][y]
+
+                # Desenha chão/parede
+                if cell.get("type") == 1: pygame.draw.rect(map_surf, COLOR_WALL, rect)
+                elif cell.get("type") == 2: pygame.draw.rect(map_surf, COLOR_FLOOR, rect)
+                elif cell.get("type") == 3:
+                    pygame.draw.rect(map_surf, COLOR_WALL, rect)
+                    color = (0, 255, 0) if self.connected_beacon else COLOR_BEACON
+                    pygame.draw.circle(map_surf, color, rect.center, 6)
+
+                # Debug: Mostra zona pintada bem fraquinho
+                if cell.get("zone_id", 0) > 0:
+                    s = pygame.Surface((TILE_SIZE, TILE_SIZE), pygame.SRCALPHA)
+                    s.fill((148, 0, 211, 40))
+                    map_surf.blit(s, (x*TILE_SIZE, y*TILE_SIZE))
+
+        # Desenha Player
+        px, py = self.player_rect.center
+        pygame.draw.circle(map_surf, (0,0,0), (px, py), 12)
+        pygame.draw.circle(map_surf, COLOR_PLAYER, (px, py), 10)
+
+        # Blit Centralizado
+        self.screen.blit(map_surf, (self.offset_x, self.offset_y))
+
+        # --- UI LATERAL ---
+        ui_x = WINDOW_WIDTH - SIDEBAR_WIDTH
+        pygame.draw.rect(self.screen, (245, 245, 245), (ui_x, 0, SIDEBAR_WIDTH, WINDOW_HEIGHT))
+        pygame.draw.line(self.screen, (200, 200, 200), (ui_x, 0), (ui_x, WINDOW_HEIGHT), 2)
+
+        # Conteúdo
+        margin = 25
+        y_cursor = 50
+
+        title = self.font_title.render("🛒 BISTEK SCAN & GO", True, (0, 100, 0))
+        self.screen.blit(title, (ui_x + margin, y_cursor))
+        y_cursor += 50
+
+        # Lógica de Display
+        # Só mostra oferta se tiver Conexão com Beacon E estiver numa Zona válida
+        if self.connected_beacon and self.current_zone_id > 0:
+            data = DB_PROMOCOES.get(self.current_zone_id, DB_PROMOCOES[0])
+
+            # Card Setor
+            pygame.draw.rect(self.screen, (255, 255, 255), (ui_x + margin, y_cursor, SIDEBAR_WIDTH - 50, 100), border_radius=10)
+            pygame.draw.rect(self.screen, (0, 150, 0), (ui_x + margin, y_cursor, SIDEBAR_WIDTH - 50, 100), 2, border_radius=10)
+
+            lbl = self.font_ui.render("VOCÊ ESTÁ EM:", True, (100,100,100))
+            val = self.font_title.render(data["setor"], True, (0,0,0))
+            self.screen.blit(lbl, (ui_x + margin + 15, y_cursor + 15))
+            self.screen.blit(val, (ui_x + margin + 15, y_cursor + 40))
+            y_cursor += 120
+
+            # Card Oferta
+            pygame.draw.rect(self.screen, (255, 245, 200), (ui_x + margin, y_cursor, SIDEBAR_WIDTH - 50, 120), border_radius=10)
+
+            # Word Wrap simples
+            words = data["oferta"].split(" ")
+            line = ""
+            ty = y_cursor + 15
+            for word in words:
+                test = line + word + " "
+                if self.font_title.size(test)[0] < SIDEBAR_WIDTH - 80:
+                    line = test
+                else:
+                    self.screen.blit(self.font_title.render(line, True, (200, 50, 0)), (ui_x + margin + 15, ty))
+                    line = word + " "
+                    ty += 25
+            self.screen.blit(self.font_title.render(line, True, (200, 50, 0)), (ui_x + margin + 15, ty))
+
+            # Status Conexão
+            y_cursor += 150
+            status = self.font_ui.render("📡 Sinal Beacon: Forte", True, (0, 180, 0))
+            self.screen.blit(status, (ui_x + margin, y_cursor))
+
+        elif self.connected_beacon and self.current_zone_id == 0:
+             # Perto do Beacon mas no corredor geral (sem zona pintada)
+             lbl = self.font_ui.render("Navegando... Entre num corredor.", True, (100,100,100))
+             self.screen.blit(lbl, (ui_x + margin, y_cursor))
+        else:
+             # Longe de tudo
+             lbl = self.font_ui.render("Procurando sinal...", True, (150,150,150))
+             self.screen.blit(lbl, (ui_x + margin, y_cursor))
+
+        pygame.display.flip()
+
+    def run(self):
+        while True:
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT: pygame.quit(); sys.exit()
+            self.update()
+            self.draw()
+            self.clock.tick(60)
+
+if __name__ == "__main__":
+    SmartCartFinal().run()
+
+
+========== ARQUIVO: static/script.js ==========
+// --- UTILITÁRIOS ---
+function formatCensoredCPF(cpf) {
+    if (!cpf || cpf.length < 11) return "***.***.***-**";
+    const middle = cpf.substring(3, 6) + "." + cpf.substring(6, 9);
+    return `***.${middle}-**`;
+}
+
+function formatCensoredMatricula(mat) {
+    // Censura Matrícula: Mostra 3 primeiros e 3 últimos
+    // Ex: 12345678 -> 123***678
+    if (!mat || mat.length < 6) return mat; // Se for curta demais, mostra tudo
+    const start = mat.substring(0, 3);
+    const end = mat.substring(mat.length - 3);
+    return `${start}***${end}`;
+}
+
+function updateClock() {
+    const now = new Date();
+    const hours = String(now.getHours()).padStart(2, '0');
+    const minutes = String(now.getMinutes()).padStart(2, '0');
+    document.getElementById('clock-display').innerText = `${hours}:${minutes}`;
+}
+setInterval(updateClock, 1000);
+updateClock();
+
+// --- 1. LÓGICA DE INTERFACE (ESCALA) ---
+function resizeApp() {
+    const app = document.getElementById('app-container');
+
+    // Tamanho original do nosso Tablet Virtual
+    const targetWidth = 1280;
+    const targetHeight = 800;
+
+    // Tamanho da janela do navegador (celular ou PC)
+    const winWidth = window.innerWidth;
+    const winHeight = window.innerHeight;
+
+    // Calcula a proporção necessária para caber na largura e na altura
+    const scaleX = winWidth / targetWidth;
+    const scaleY = winHeight / targetHeight;
+
+    // Escolhe a menor escala para garantir que o tablet inteiro apareça (Fit to Screen)
+    // O 0.95 dá uma margem de segurança de 5% para não colar nas bordas
+    let scale = Math.min(scaleX, scaleY) * 0.95;
+
+    // Aplica o Zoom
+    // Como estamos usando Flexbox no body, não precisamos mais do 'translate'
+    app.style.transform = `scale(${scale})`;
+
+    // (Opcional) Força a renderização para evitar bugs visuais no Chrome Mobile
+    app.style.display = 'none';
+    app.offsetHeight; // Trigger reflow
+    app.style.display = 'flex';
+}
+
+// Ouve o redimensionamento
+// Usamos um pequeno 'delay' (setTimeout) porque quando você gira o celular,
+// o navegador leva uns milissegundos para recalcular o tamanho da janela.
+window.addEventListener('resize', () => {
+    setTimeout(resizeApp, 100);
+});
+
+// orientationchange é específico para celulares
+window.addEventListener('orientationchange', () => {
+    setTimeout(resizeApp, 200);
+});
+
+// Chama ao carregar
+window.addEventListener('load', () => {
+    resizeApp();
+    loadMapData();
+});
+window.addEventListener('resize', resizeApp);
+window.addEventListener('load', () => { resizeApp(); loadMapData(); });
+
+// --- 2. LOGIN & CADASTRO ---
+function toggleRegisterView(showRegister) {
+    document.getElementById('login-form-container').style.display = showRegister ? 'none' : 'block';
+    document.getElementById('register-form-container').style.display = showRegister ? 'block' : 'none';
+    document.getElementById('login-error').style.display = 'none';
+    document.getElementById('reg-error').style.display = 'none';
+}
+
+function toggleEmployeeFields() {
+    const isEmp = document.getElementById('check-employee').checked;
+    document.getElementById('employee-fields').style.display = isEmp ? 'block' : 'none';
+}
+
+function doRegister() {
+    const cpf = document.getElementById('reg-cpf').value;
+    const nome = document.getElementById('reg-nome').value;
+    const isEmployee = document.getElementById('check-employee').checked;
+    const matricula = document.getElementById('reg-matricula').value;
+    const cargo = document.getElementById('reg-cargo').value;
+
+    if (!cpf || !nome) {
+        document.getElementById('reg-error').innerText = "Preencha CPF e Nome.";
+        document.getElementById('reg-error').style.display = 'block';
+        return;
+    }
+
+    fetch('/api/register', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+            cpf: cpf, nome: nome, is_employee: isEmployee,
+            matricula: matricula, cargo: cargo
+        })
+    })
+    .then(r => r.json())
+    .then(data => {
+        if(data.success) {
+            alert("Cadastro realizado com sucesso!");
+            toggleRegisterView(false);
+        } else {
+            document.getElementById('reg-error').innerText = data.message || "Erro ao cadastrar.";
+            document.getElementById('reg-error').style.display = 'block';
+        }
+    });
+}
+
+function doLogin() {
+    const cpf = document.getElementById('cpf-input').value;
+    fetch('/api/login', {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({cpf: cpf})
+    })
+    .then(r => r.json())
+    .then(data => {
+        if(data.success) {
+            document.getElementById('login-overlay').style.display = 'none';
+            document.getElementById('user-display').innerText = data.user.nome;
+
+            // --- LÓGICA DO RODAPÉ (NOVA) ---
+            const user = data.user;
+            let typeText = "";
+            let idText = "";
+
+            if (user.tipo === 'cliente') {
+                typeText = "Tipo: Cliente Bistek";
+                let cpfClean = user.cpf_display || "000";
+                idText = `CPF: ${formatCensoredCPF(cpfClean)}`;
+            }
+            else if (user.tipo === 'admin') {
+                typeText = "Tipo: Administrador";
+                idText = "Acesso Total";
+            }
+            else {
+                // É funcionário (A string vem do Python tipo: "Funcionário - Cargo (Mat: 123)")
+                // Vamos tentar extrair os dados limpos se estiverem no JSON, ou parsear a string
+                // Mas o jeito mais fácil é confiar na estrutura:
+                if (user.tipo.includes("Funcionário")) {
+                     // Exemplo de string salva no python: "Funcionário - Gerente (Mat: 123456)"
+                     // Vamos exibir algo mais bonito no front
+                     // O python salvou tudo numa string só no 'tipo', vamos limpar
+                     // Se você quiser mais controle, o ideal seria salvar cargo e matricula separado no JSON
+                     // Mas vamos usar RegEx pra extrair da string atual:
+                     const match = user.tipo.match(/Funcionário - (.*) \(Mat: (.*)\)/);
+                     if (match) {
+                         const cargo = match[1];
+                         const mat = match[2];
+                         typeText = `Tipo: Funcionário - ${cargo}`;
+                         idText = `Mat: ${formatCensoredMatricula(mat)}`;
+                     } else {
+                         typeText = user.tipo; // Fallback
+                         idText = "";
+                     }
+                }
+            }
+
+            document.getElementById('footer-type').innerText = typeText;
+            document.getElementById('footer-cpf').innerText = idText;
+
+        } else {
+            document.getElementById('login-error').style.display = 'block';
+        }
+    });
+}
+document.getElementById('cpf-input')?.addEventListener("keypress", (e) => { if (e.key === "Enter") doLogin(); });
+
+
+// --- 3. CORE DO SISTEMA ---
+const canvas = document.getElementById('map-canvas');
+const ctx = canvas.getContext('2d');
+let mapData = null;
+let currentX=0, currentY=0, targetX=0, targetY=0;
+
+function updateDashboard() {
+    fetch('/api/status')
+        .then(r => r.json())
+        .then(data => {
+            // Texto Gigante do Setor
+            document.getElementById('location-name').innerText = data.setor;
+            document.getElementById('offer-text').innerText = data.oferta;
+
+            if (data.theme === 'red') document.body.classList.add('theme-red');
+            else document.body.classList.remove('theme-red');
+
+            renderCart(data.cart, data.total);
+            targetX = data.pos_x; targetY = data.pos_y;
+            if (currentX === 0 && currentY === 0) { currentX = targetX; currentY = targetY; }
+            if (!mapData) loadMapData();
+        }).catch(e=>{});
+}
+setInterval(updateDashboard, 500);
+
+function deleteItem(id) {
+    fetch('/api/cart/remove', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({id: id}) });
+}
+
+function renderCart(items, total) {
+    const container = document.getElementById('cart-container');
+    if (!container) return;
+    if (container.children.length === items.length && document.getElementById('total-price').innerText.includes(total.toFixed(2))) return;
+
+    container.innerHTML = "";
+    if (items.length === 0) container.innerHTML = "<div style='padding:40px; color:#aaa; text-align:center; font-style:italic;'>Seu carrinho está vazio</div>";
+
+    items.slice().reverse().forEach(item => {
+        const div = document.createElement('div');
+        div.className = 'cart-item';
+        div.innerHTML = `
+            <div style="display:flex; align-items:center; gap:12px;">
+                <span class="material-icons" style="color:#555; font-size:24px;">${item.icon || 'local_offer'}</span>
+                <span style="font-weight:600; color:#333; font-size:16px;">${item.nome}</span>
+            </div>
+            <div style="display:flex; align-items:center; gap:15px;">
+                <b style="color:#444; font-size:16px;">R$ ${item.preco.toFixed(2)}</b>
+                <span onclick="deleteItem(${item.id})" class="material-icons" style="cursor:pointer; color:#d32f2f; font-size:22px;">delete</span>
+            </div>`;
+        container.appendChild(div);
+    });
+    document.getElementById('total-price').innerText = `R$ ${total.toFixed(2)}`;
+}
+
+function loadMapData() { fetch('/api/mapa').then(r => r.json()).then(m => { mapData = m; }); }
+function gameLoop() {
+    if (mapData) {
+        currentX += (targetX - currentX) * 0.1;
+        currentY += (targetY - currentY) * 0.1;
+        drawMap(currentX, currentY);
+    }
+    requestAnimationFrame(gameLoop);
+}
+requestAnimationFrame(gameLoop);
+
+function drawMap(px, py) {
+    const widget = canvas.parentElement;
+    const w = widget.clientWidth; const h = widget.clientHeight;
+    canvas.width = w; canvas.height = h;
+
+    const tileW = w / mapData.width; const tileH = h / mapData.height;
+    const TILE = Math.min(tileW, tileH);
+    const offsetX = (w - (mapData.width * TILE)) / 2;
+    const offsetY = (h - (mapData.height * TILE)) / 2;
+
+    // Fundo
+    ctx.fillStyle = "#e0e0e0"; ctx.fillRect(0, 0, w, h);
+
+    // Grid (Paredes e Beacons)
+    for (let x = 0; x < mapData.width; x++) {
+        for (let y = 0; y < mapData.height; y++) {
+            let cell = mapData.grid[x][y];
+            let dx = offsetX + (x * TILE); let dy = offsetY + (y * TILE);
+            if (cell.type === 1) { ctx.fillStyle = "#555"; ctx.fillRect(dx, dy, TILE+0.5, TILE+0.5); }
+            if (cell.type === 3) { ctx.fillStyle = "#004B50"; ctx.fillRect(dx, dy, TILE, TILE); }
+        }
+    }
+
+    // Coordenadas Finais do Player
+    let scale = TILE / mapData.tile_size;
+    let finalX = offsetX + (px * scale);
+    let finalY = offsetY + (py * scale);
+
+    // --- EFEITO RADAR / SONAR (NOVO) ---
+    // Cria uma oscilação baseada no tempo atual
+    const time = Date.now() / 1000; // Tempo em segundos
+    const pulseSpeed = 2; // Velocidade da onda
+
+    // O resto da divisão cria um ciclo de 0 a 1 repetitivo
+    const wave = (time * pulseSpeed) % 1;
+
+    // Raio cresce de 0 até 3x o tamanho do player
+    const maxRadius = (TILE/2.5) * 3;
+    const currentRadius = (TILE/2.5) + (maxRadius * wave);
+
+    // Opacidade diminui conforme cresce (1 -> 0)
+    const opacity = 1 - wave;
+
+    // Desenha a Onda
+    ctx.beginPath();
+    ctx.arc(finalX, finalY, currentRadius, 0, Math.PI*2);
+    ctx.fillStyle = `rgba(211, 47, 47, ${opacity})`; // Vermelho com transparência
+    ctx.fill();
+    // ------------------------------------
+
+    // Sombra do Player (Fixa)
+    ctx.fillStyle = "rgba(0,0,0,0.3)";
+    ctx.beginPath(); ctx.ellipse(finalX, finalY + 5, TILE/2.5, TILE/4, 0, 0, Math.PI*2); ctx.fill();
+
+    // Player (Bolinha Sólida)
+    ctx.fillStyle = "#D32F2F";
+    ctx.beginPath(); ctx.arc(finalX, finalY, TILE/2.5, 0, Math.PI*2); ctx.fill();
+
+    // Borda Branca
+    ctx.strokeStyle = "white"; ctx.lineWidth = 3; ctx.stroke();
+}
+
+
+========== ARQUIVO: static/style.css ==========
+* { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+
+body {
+    background: radial-gradient(circle, #2c3e50 0%, #000 100%);
+    width: 100vw; height: 100vh;
+    overflow: hidden;
+    display: flex; justify-content: center; align-items: center;
+}
+
+#app-container {
+    width: 1280px; height: 800px;
+    background-color: #1a1a1a;
+    position: absolute; top: 50%; left: 50%;
+    border-radius: 30px;
+    box-shadow: 0 0 0 2px #444, 0 30px 80px rgba(0,0,0,0.9);
+    padding: 20px;
+    display: flex;
+}
+
+#screen-content {
+    background-color: #f5f5f5;
+    width: 100%; height: 100%;
+    border-radius: 15px;
+    overflow: hidden;
+    display: flex; flex-direction: column;
+    position: relative;
+}
+
+/* TEMAS */
+:root { --primary: #004B50; --secondary: #B4A064; --bg-light: #fff; --text-dark: #333; }
+body.theme-red #screen-content { --primary: #9e1c1c; } /* Vermelho mais sóbrio */
+
+/* HEADER */
+header {
+    background-color: var(--primary); color: white;
+    padding: 0 35px; height: 80px;
+    display: flex; justify-content: space-between; align-items: center;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.15);
+    z-index: 10;
+}
+header {
+    background-color: var(--primary); color: white;
+    padding: 0 35px; height: 80px;
+    display: flex; justify-content: space-between; align-items: center;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.15);
+    z-index: 10;
+}
+
+.logo h1 {
+    font-size: 28px;
+    font-weight: 700;
+    /* Removido o uppercase para respeitar letras maiúsculas/minúsculas */
+    letter-spacing: 0.5px;
+}
+
+/* EFEITO CLUBE (GRADIENTE ANIMADO) */
+.clube-gradient {
+    /* O Gradiente tem Ouro nas pontas e Branco no meio (o brilho) */
+    background: linear-gradient(
+        120deg,
+        #FFD700 0%,
+        #ff8c00 20%,
+        #ffffff 50%,
+        #ff8c00 80%,
+        #FFD700 100%
+    );
+    background-size: 200% auto; /* Aumenta o fundo para poder mover */
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    font-weight: 800;
+    font-style: italic;
+    display: inline-block;
+
+    /* A Animação do Flash */
+    animation: shine 3s linear infinite;
+}
+
+/* Definição da Animação */
+@keyframes shine {
+    to {
+        background-position: 200% center;
+    }
+}
+
+.user-info { display: flex; align-items: center; gap: 10px; font-size: 18px; font-weight: 500; }
+
+/* MAIN */
+main { flex: 1; display: flex; padding: 25px; gap: 25px; overflow: hidden; padding-bottom: 10px; }
+
+/* CART */
+.cart-panel {
+    flex: 1.4; background: var(--bg-light);
+    border-radius: 12px; padding: 20px;
+    display: flex; flex-direction: column;
+    box-shadow: 0 2px 15px rgba(0,0,0,0.05);
+}
+.cart-header {
+    font-size: 18px; font-weight: bold; color: var(--primary); margin-bottom: 15px; border-bottom: 2px solid #eee; padding-bottom: 10px; display: flex; align-items: center; gap: 10px;
+}
+.item-list { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; padding-right: 5px;}
+.cart-item {
+    background: #fff; padding: 12px 15px; border-radius: 8px; border: 1px solid #e0e0e0;
+    display: flex; justify-content: space-between; align-items: center;
+}
+.cart-total {
+    margin-top: 15px; background: #333; color: white; padding: 20px;
+    border-radius: 8px; display: flex; justify-content: space-between; font-size: 24px; font-weight: bold; box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+}
+
+/* SMART PANEL (Onde fica o Contexto) */
+.smart-panel { flex: 1; display: flex; flex-direction: column; gap: 20px; }
+
+.context-card {
+    background: var(--primary); color: white; border-radius: 12px; padding: 25px; flex: 0.8;
+    border-top: 6px solid var(--secondary); display: flex; flex-direction: column; justify-content: center;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    position: relative;
+    overflow: hidden;
+}
+
+/* TEXTO DE LOCALIZAÇÃO GIGANTE */
+.location-header {
+    display: flex; align-items: center; gap: 8px; opacity: 0.8; font-size: 14px; margin-bottom: 5px;
+}
+#location-name {
+    font-size: 38px; /* BEM GRANDE */
+    font-weight: 900;
+    text-transform: uppercase;
+    color: white;
+    margin-bottom: 15px;
+    letter-spacing: 1px;
+    line-height: 1;
+}
+
+.offer-divider { height: 1px; background: rgba(255,255,255,0.3); width: 100%; margin-bottom: 15px; }
+
+.offer-container { display: flex; flex-direction: column; }
+.offer-label { font-size: 14px; color: var(--secondary); font-weight: bold; text-transform: uppercase; margin-bottom: 5px; }
+.offer-text { font-size: 24px; font-weight: 600; line-height: 1.2; }
+
+/* MAPA */
+.map-widget {
+    background: #e0e0e0; flex: 1.2; border-radius: 12px; border: 4px solid white;
+    overflow: hidden; display: flex; justify-content: center; align-items: center; position: relative;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.05);
+}
+canvas { width: 100%; height: 100%; }
+
+/* FOOTER BAR */
+footer {
+    background: #222; color: #bbb;
+    height: 50px; display: flex; justify-content: space-between; align-items: center;
+    padding: 0 35px; font-size: 14px; border-top: 1px solid #444;
+}
+.footer-item { display: flex; align-items: center; gap: 8px; }
+.footer-item .material-icons { font-size: 18px; color: var(--secondary); }
+.user-details { font-weight: 500; color: white; }
+.separator { color: #555; margin: 0 10px; }
+
+/* FORMS (Login) */
+#login-overlay {
+    position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+    background: rgba(0,0,0,0.9); z-index: 9999;
+    display: flex; align-items: center; justify-content: center;
+    backdrop-filter: blur(10px);
+}
+.login-box {
+    background: white; padding: 40px; border-radius: 15px;
+    text-align: center; width: 480px; box-shadow: 0 10px 40px rgba(0,0,0,0.6);
+}
+.login-box h1 { color: var(--primary); margin-bottom: 5px; font-size: 26px; }
+.login-box p { color: #666; font-size: 15px; margin-bottom: 25px; }
+
+.input-group {
+    display: flex; align-items: center; background: #f0f0f0; border: 1px solid #ccc; border-radius: 8px; margin-bottom: 20px; padding: 0 15px;
+}
+.input-group input, .form-grid input {
+    width: 100%; border: none; background: transparent; padding: 18px; font-size: 18px; outline: none;
+}
+.form-grid { display: flex; gap: 10px; margin-bottom: 15px; }
+.form-grid input { background: #f0f0f0; border: 1px solid #ccc; border-radius: 8px; padding: 15px; }
+
+.employee-check { display: flex; align-items: center; gap: 10px; margin-bottom: 20px; justify-content: flex-start; color: #555; font-size: 15px; cursor: pointer; }
+.employee-check input { width: 20px; height: 20px; cursor: pointer; accent-color: var(--primary); }
+
+.btn-primary {
+    width: 100%; padding: 18px; background: var(--primary); color: white;
+    border: none; font-size: 16px; cursor: pointer; border-radius: 8px; font-weight: bold; margin-bottom: 10px; transition: 0.2s;
+    text-transform: uppercase; letter-spacing: 1px;
+}
+.btn-primary:hover { opacity: 0.95; transform: translateY(-2px); }
+.btn-secondary {
+    width: 100%; padding: 15px; background: transparent; color: var(--primary);
+    border: 2px solid var(--primary); font-size: 14px; cursor: pointer; border-radius: 8px; font-weight: bold;
+}
+.btn-text { background: none; border: none; color: #666; cursor: pointer; text-decoration: underline; margin-top: 10px; font-size: 13px; }
+.error-msg { color: #d32f2f; font-size: 14px; margin-top: 15px; font-weight: bold; background: #ffeaea; padding: 10px; border-radius: 5px; }
+
+
+========== ARQUIVO: templates/remote.html ==========
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Controle Jyan</title>
+    <style>
+        body { background: #222; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; font-family: sans-serif;}
+        .d-pad { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-bottom: 30px; }
+
+        button {
+            width: 80px; height: 80px; font-size: 30px;
+            background: #444; color: white; border: none; border-radius: 10px;
+            touch-action: manipulation; /* Evita zoom no celular */
+            user-select: none;
+        }
+        button:active { background: #004B50; transform: scale(0.95); }
+
+        /* Estilo do Botão de Tema */
+        .theme-switch {
+            display: flex; flex-direction: column; align-items: center; gap: 10px; color: white;
+            margin-top: 20px;
+        }
+        .theme-btn {
+            width: 60px; height: 60px; border: 3px solid white; border-radius: 50%;
+            background: #004B50; cursor: pointer; transition: 0.3s;
+            box-shadow: 0 0 10px rgba(0,0,0,0.5);
+        }
+        /* Quando estiver vermelho */
+        .theme-btn.red-active { background: #D32F2F; border-color: #ffaaaa; box-shadow: 0 0 15px #D32F2F; }
+        .action-btn {
+            background: #ff9800; /* Laranja Varejo */
+            width: 90%;
+            padding: 15px;
+            margin-top: 20px;
+            border-radius: 10px;
+            font-size: 18px;
+            font-weight: bold;
+            color: white;
+            border: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            box-shadow: 0 4px 0 #b36b00;
+        }
+        .action-btn:active {
+            transform: translateY(4px);
+            box-shadow: none;
+        }
+    </style>
+</head>
+<body>
+    <h2 style="color:white">Controle Carrinho</h2>
+
+    <div class="d-pad">
+        <div></div>
+        <button ontouchstart="startMove('up')" onmousedown="startMove('up')" ontouchend="stopMove()" onmouseup="stopMove()">⬆️</button>
+        <div></div>
+
+        <button ontouchstart="startMove('left')" onmousedown="startMove('left')" ontouchend="stopMove()" onmouseup="stopMove()">⬅️</button>
+        <button ontouchstart="startMove('down')" onmousedown="startMove('down')" ontouchend="stopMove()" onmouseup="stopMove()">⬇️</button>
+        <button ontouchstart="startMove('right')" onmousedown="startMove('right')" ontouchend="stopMove()" onmouseup="stopMove()">➡️</button>
+    </div>
+    <button class="action-btn" onclick="scanProduct()">
+        <span>📷</span> ESCANEAR PRODUTO (Aleatório)
+    </button>
+    <div class="theme-switch">
+        <span>TROCAR TEMA</span>
+        <div class="theme-btn" id="themeBtn" onclick="toggleTheme()"></div>
+    </div>
+
+    <script>
+        let moveInterval = null;
+
+        function sendMove(dir) {
+            fetch('/api/move', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({direction: dir})
+            }).catch(e => console.log(e));
+        }
+
+        function startMove(dir) {
+            if (moveInterval) return; // Se já está movendo, não faz nada
+
+            // 1. Envia comando imediato
+            sendMove(dir);
+            if (navigator.vibrate) navigator.vibrate(30);
+
+            // 2. Continua enviando a cada 100ms enquanto segura
+            moveInterval = setInterval(() => {
+                sendMove(dir);
+            }, 100);
+        }
+
+        function stopMove() {
+            clearInterval(moveInterval);
+            moveInterval = null;
+        }
+
+        // Lógica do Tema
+        function toggleTheme() {
+            fetch('/api/toggle_theme', { method: 'POST' })
+                .then(r => r.json())
+                .then(data => {
+                    const btn = document.getElementById('themeBtn');
+                    if(data.theme === 'red') {
+                        btn.classList.add('red-active');
+                    } else {
+                        btn.classList.remove('red-active');
+                    }
+                    if (navigator.vibrate) navigator.vibrate(50);
+                });
+        }
+        function scanProduct() {
+            fetch('/api/cart/add_random', { method: 'POST' })
+            .then(r => r.json())
+            .then(data => {
+                if (navigator.vibrate) navigator.vibrate([50, 50, 50]); // Vibra Bip-Bip
+                console.log("Adicionado:", data.item.nome);
+            });
+        }
+    </script>
+</body>
+</html>
+
+
+========== ARQUIVO: templates/tablet.html ==========
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Bistek Smart Cart</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+</head>
+<body>
+    ```
+
+---
+
+### 2. `static/style.css` (Centralização Flexbox)
+Mudei a estratégia de centralização do `body` e do `#app-container`. O Flexbox é muito mais robusto para manter o tablet no meio da tela do celular, seja em pé ou deitado.
+
+**Substitua o começo do arquivo CSS:**
+
+```css
+* { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+
+body {
+    background: radial-gradient(circle, #2c3e50 0%, #000 100%);
+    width: 100vw;
+    height: 100vh;
+    /* Garante que nada vaze da tela no celular */
+    overflow: hidden;
+    position: fixed; /* Trava o scroll elástico do iOS/Android */
+
+    /* CENTRALIZAÇÃO FLEXBOX (Mais estável que absolute) */
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+#app-container {
+    /* Tamanho Fixo de Referência (HD+) */
+    width: 1280px;
+    height: 800px;
+
+    background-color: #1a1a1a;
+    border-radius: 30px;
+    box-shadow: 0 0 0 2px #444, 0 30px 80px rgba(0,0,0,0.9);
+    padding: 20px;
+    display: flex;
+
+    /* A escala será aplicada via JS, mas o ponto de origem é o centro */
+    transform-origin: center center;
+
+    /* Removemos o 'position: absolute' daqui para usar o Flex do body */
+    flex-shrink: 0; /* Impede o container de tentar encolher sozinho */
+}
+
+    <div id="app-container">
+        <div id="screen-content">
+
+          <div id="login-overlay">
+
+                <div class="login-box" id="login-form-container">
+                    <h1>Acesso <span class="clube-gradient">Clube</span> Bistek</h1>
+
+                    <p>Informe seu CPF para continuar</p>
+
+                    <div class="input-group">
+                        <span class="material-icons">person</span>
+                        <input type="text" id="cpf-input" placeholder="000.000.000-00" autofocus>
+                    </div>
+
+                    <button class="btn-primary" onclick="doLogin()">ACESSAR SISTEMA</button>
+                    <button class="btn-secondary" onclick="toggleRegisterView(true)">Cadastrar Novo Cliente</button>
+
+                    <p id="login-error" class="error-msg" style="display: none;">CPF não encontrado na base de dados.</p>
+                </div>
+
+                <div class="login-box" id="register-form-container" style="display: none;">
+                    <h1>Novo Cadastro</h1>
+
+                    <div class="form-grid">
+                        <input type="text" id="reg-cpf" placeholder="CPF (Somente Números)">
+                        <input type="text" id="reg-nome" placeholder="Nome Completo">
+                    </div>
+
+                    <div class="employee-check">
+                        <input type="checkbox" id="check-employee" onchange="toggleEmployeeFields()">
+                        <label for="check-employee">Colaborador Bistek</label>
+                    </div>
+
+                    <div id="employee-fields" style="display: none;">
+                        <div class="form-grid">
+                            <input type="text" id="reg-matricula" placeholder="Matrícula">
+                            <input type="text" id="reg-cargo" placeholder="Cargo / Ocupação">
+                        </div>
+                    </div>
+
+                    <button class="btn-primary" onclick="doRegister()">FINALIZAR CADASTRO</button>
+                    <button class="btn-text" onclick="toggleRegisterView(false)">Voltar para Login</button>
+
+                    <p id="reg-error" class="error-msg" style="display: none;"></p>
+                </div>
+            </div>
+
+           <header>
+                <div class="logo">
+                    <h1><span class="clube-gradient">Clube</span> Bistek</h1>
+                </div>
+                <div class="user-info">
+                    <span class="material-icons">account_circle</span>
+                    <span id="user-display">Identifique-se</span>
+                </div>
+            </header>
+
+            <main>
+                <section class="cart-panel">
+                    <div class="cart-header">
+                        <span class="material-icons">shopping_cart</span>
+                        SUAS COMPRAS
+                    </div>
+                    <div class="item-list" id="cart-container">
+                        </div>
+                    <div class="cart-total">
+                        <span>Subtotal</span>
+                        <span id="total-price">R$ 0,00</span>
+                    </div>
+                </section>
+
+                <section class="smart-panel">
+                    <div class="context-card" id="offer-card">
+                        <div class="location-header">
+                            <span class="material-icons">place</span>
+                            <span>VOCÊ ESTÁ EM:</span>
+                        </div>
+                        <h2 id="location-name">CORREDOR GERAL</h2>
+
+                        <div class="offer-divider"></div>
+
+                        <div class="offer-container">
+                            <span class="offer-label">Oferta Relâmpago:</span>
+                            <div class="offer-text" id="offer-text">Navegue para ver promoções...</div>
+                        </div>
+                    </div>
+
+                    <div class="map-widget">
+                        <canvas id="map-canvas"></canvas>
+                    </div>
+                </section>
+            </main>
+
+            <footer>
+                <div class="footer-item">
+                    <span class="material-icons">schedule</span>
+                    <span>Aberto: 07:20 - 22:00</span>
+                </div>
+
+                <div class="footer-item user-details">
+                    <span class="material-icons">badge</span>
+                    <span id="footer-type">Visitante</span>
+                    <span class="separator">|</span>
+                    <span id="footer-cpf">CPF: --</span>
+                </div>
+
+                <div class="footer-item">
+                    <span class="material-icons">access_time</span>
+                    <span id="clock-display">00:00</span>
+                </div>
+            </footer>
+
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
+</body>
+</html>
+
+
+--- FIM DO CONTEXTO DO PROJETO ---

@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Controle Jyan</title>
+    <style>
+        body { background: #222; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; font-family: sans-serif;}
+        .d-pad { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-bottom: 30px; }
+
+        button {
+            width: 80px; height: 80px; font-size: 30px;
+            background: #444; color: white; border: none; border-radius: 10px;
+            touch-action: manipulation; /* Evita zoom no celular */
+            user-select: none;
+        }
+        button:active { background: #004B50; transform: scale(0.95); }
+
+        /* Estilo do Botão de Tema */
+        .theme-switch {
+            display: flex; flex-direction: column; align-items: center; gap: 10px; color: white;
+            margin-top: 20px;
+        }
+        .theme-btn {
+            width: 60px; height: 60px; border: 3px solid white; border-radius: 50%;
+            background: #004B50; cursor: pointer; transition: 0.3s;
+            box-shadow: 0 0 10px rgba(0,0,0,0.5);
+        }
+        /* Quando estiver vermelho */
+        .theme-btn.red-active { background: #D32F2F; border-color: #ffaaaa; box-shadow: 0 0 15px #D32F2F; }
+        .action-btn {
+            background: #ff9800; /* Laranja Varejo */
+            width: 90%;
+            padding: 15px;
+            margin-top: 20px;
+            border-radius: 10px;
+            font-size: 18px;
+            font-weight: bold;
+            color: white;
+            border: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            box-shadow: 0 4px 0 #b36b00;
+        }
+        .action-btn:active {
+            transform: translateY(4px);
+            box-shadow: none;
+        }
+    </style>
+</head>
+<body>
+    <h2 style="color:white">Controle Carrinho</h2>
+
+    <div class="d-pad">
+        <div></div>
+        <button ontouchstart="startMove('up')" onmousedown="startMove('up')" ontouchend="stopMove()" onmouseup="stopMove()">⬆️</button>
+        <div></div>
+
+        <button ontouchstart="startMove('left')" onmousedown="startMove('left')" ontouchend="stopMove()" onmouseup="stopMove()">⬅️</button>
+        <button ontouchstart="startMove('down')" onmousedown="startMove('down')" ontouchend="stopMove()" onmouseup="stopMove()">⬇️</button>
+        <button ontouchstart="startMove('right')" onmousedown="startMove('right')" ontouchend="stopMove()" onmouseup="stopMove()">➡️</button>
+    </div>
+    <button class="action-btn" onclick="scanProduct()">
+        <span>📷</span> ESCANEAR PRODUTO (Aleatório)
+    </button>
+    <div class="theme-switch">
+        <span>TROCAR TEMA</span>
+        <div class="theme-btn" id="themeBtn" onclick="toggleTheme()"></div>
+    </div>
+
+    <script>
+        let moveInterval = null;
+
+        function sendMove(dir) {
+            fetch('/api/move', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({direction: dir})
+            }).catch(e => console.log(e));
+        }
+
+        function startMove(dir) {
+            if (moveInterval) return; // Se já está movendo, não faz nada
+
+            // 1. Envia comando imediato
+            sendMove(dir);
+            if (navigator.vibrate) navigator.vibrate(30);
+
+            // 2. Continua enviando a cada 100ms enquanto segura
+            moveInterval = setInterval(() => {
+                sendMove(dir);
+            }, 100);
+        }
+
+        function stopMove() {
+            clearInterval(moveInterval);
+            moveInterval = null;
+        }
+
+        // Lógica do Tema
+        function toggleTheme() {
+            fetch('/api/toggle_theme', { method: 'POST' })
+                .then(r => r.json())
+                .then(data => {
+                    const btn = document.getElementById('themeBtn');
+                    if(data.theme === 'red') {
+                        btn.classList.add('red-active');
+                    } else {
+                        btn.classList.remove('red-active');
+                    }
+                    if (navigator.vibrate) navigator.vibrate(50);
+                });
+        }
+        function scanProduct() {
+            fetch('/api/cart/add_random', { method: 'POST' })
+            .then(r => r.json())
+            .then(data => {
+                if (navigator.vibrate) navigator.vibrate([50, 50, 50]); // Vibra Bip-Bip
+                console.log("Adicionado:", data.item.nome);
+            });
+        }
+    </script>
+</body>
+</html>

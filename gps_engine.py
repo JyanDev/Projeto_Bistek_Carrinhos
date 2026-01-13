@@ -43,7 +43,47 @@ class GPSEngine:
         self.signal_radius = 4 * TILE_SIZE
         self.walls = []
         self.build_walls()
+    def update_manual(self, keys_dict):
+        """
+        Versão do update que aceita um dicionário simples em vez de pygame.key.get_pressed()
+        keys_dict espera: {"UP": bool, "DOWN": bool, "LEFT": bool, "RIGHT": bool}
+        """
+        mx, my = 0, 0
 
+        # A velocidade aqui pode ser ajustada. Como o celular manda um pulso,
+        # talvez seja bom mover um pouco mais por clique (ex: self.player_speed * 2)
+        speed = self.player_speed * 1 # Aumentei para ficar mais responsivo no toque
+
+        if keys_dict.get("UP"): my = -speed
+        if keys_dict.get("DOWN"): my = speed
+        if keys_dict.get("LEFT"): mx = -speed
+        if keys_dict.get("RIGHT"): mx = speed
+
+        # Lógica de Movimento e Colisão (Idêntica ao update original)
+        if mx != 0:
+            test_rect = self.player_rect.move(mx, 0)
+            if not self.check_collision(test_rect): self.player_rect.move_ip(mx, 0)
+        if my != 0:
+            test_rect = self.player_rect.move(0, my)
+            if not self.check_collision(test_rect): self.player_rect.move_ip(0, my)
+
+        # Atualiza Sensores (Beacons e Zonas)
+        px, py = self.player_rect.center
+
+        # 1. Beacon Check
+        near_beacon = False
+        for bx, by in self.beacons:
+            dist = math.hypot(bx-px, by-py)
+            if dist < self.signal_radius:
+                if self.raycast((px, py), (bx, by)):
+                    near_beacon = True
+                    break
+        self.connected_beacon = near_beacon
+
+        # 2. Zone Check
+        gx, gy = int(px // TILE_SIZE), int(py // TILE_SIZE)
+        if 0 <= gx < self.grid_w and 0 <= gy < self.grid_h:
+            self.current_zone_id = self.grid[gx][gy].get("zone_id", 0)
     def load_map(self):
         try:
             fname = "loja_mapa_v3.json"
