@@ -158,18 +158,6 @@ def toggle_theme():
 def get_map_data():
     return jsonify({"grid": engine.grid, "width": engine.grid_w, "height": engine.grid_h, "tile_size": 30})
 
-@app.route('/reset_posicao')
-def reset_posicao():
-    # Zera para a entrada da loja (ajuste o X,Y conforme seu mapa)
-    gps_engine.posicao_atual = [50, 50]
-    gps_engine.rota_calculada = []
-    return jsonify({"status": "resetado"})
-@app.route('/modo_demo')
-def modo_demo():
-    # Define uma rota fixa bonita que passa por 3 corredores
-    rota_bonita = [[50,50], [100,50], [100, 200], [300, 200]]
-    gps_engine.rota_calculada = rota_bonita
-    return jsonify({"status": "demo iniciada"})
 if __name__ == '__main__':
     Thread(target=start_tunnel).start()
     app.run(debug=True, host='0.0.0.0', port=5000, threaded=True)

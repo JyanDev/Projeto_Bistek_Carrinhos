@@ -69,13 +69,10 @@
         <span>TROCAR TEMA</span>
         <div class="theme-btn" id="themeBtn" onclick="toggleTheme()"></div>
     </div>
-    <button onclick="resetarCarrinho()" style="background: red; color: white;">🆘 Reset</button>
-    <button onclick="iniciarDemo()">✨ Demo</button>
+
     <script>
         let moveInterval = null;
-        function resetarCarrinho() {
-            fetch('/reset_posicao').then(alert('Carrinho Resetado!'));
-            }
+
         function sendMove(dir) {
             fetch('/api/move', {
                 method: 'POST',
@@ -96,7 +93,7 @@
                 sendMove(dir);
             }, 100);
         }
-        function iniciarDemo() { fetch('/modo_demo'); }
+
         function stopMove() {
             clearInterval(moveInterval);
             moveInterval = null;
