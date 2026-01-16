@@ -690,7 +690,7 @@ body {
 
     /* MODO 1: IMAGEM (Padrão) */
     background: linear-gradient(rgba(0,0,0,0.6), rgba(0,0,0,0.6)),
-                url('/static/ads/bg-tablet.jpg');
+                url('/static/ads/fundo.jpg');
     background-size: cover; background-position: center;
 
     border: 16px solid var(--bezel-color);
@@ -1470,6 +1470,7 @@ function applyStyle(theme, bgMode) {
     container.className = '';
     if (bgMode === 'clean') container.classList.add('bg-clean');
     if (bgMode === 'dark') container.classList.add('bg-dark');
+
 }
 
 function resizeAppSmart() {
