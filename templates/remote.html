@@ -9,8 +9,31 @@
 
     <link rel="stylesheet" href="{{ url_for('static', filename='css/global.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/remote.css') }}">
+
+    <style>
+        /* Botões de Estilo Cicláveis */
+        .style-controls {
+            display: flex; gap: 10px; margin-bottom: 10px;
+        }
+        .cycle-btn {
+            flex: 1;
+            background: #333;
+            color: white;
+            border: 1px solid #444;
+            padding: 15px;
+            border-radius: 12px;
+            font-weight: bold;
+            display: flex; flex-direction: column; align-items: center; gap: 5px;
+            font-size: 12px;
+        }
+        .cycle-btn:active { background: #444; transform: scale(0.98); }
+        .cycle-btn span { font-size: 24px; }
+
+        .control-footer { padding-bottom: 30px; }
+    </style>
 </head>
 <body>
+
     <div id="control-mode">
         <header>
             <span style="font-weight:bold; color:#888">CONTROLE REMOTO</span>
@@ -28,11 +51,28 @@
         </main>
 
         <footer class="control-footer">
-            <button class="btn-action btn-scan" onclick="triggerScan()"><span class="material-icons">qr_code_scanner</span> ESCANEAR</button>
+            <button class="btn-action btn-scan" onclick="triggerScan()">
+                <span class="material-icons">qr_code_scanner</span> ESCANEAR
+            </button>
+
+            <div class="style-controls">
+                <button class="cycle-btn" onclick="cycleBg()">
+                    <span class="material-icons">wallpaper</span>
+                    Mudar Fundo
+                </button>
+                <button class="cycle-btn" onclick="cycleTheme()">
+                    <span class="material-icons">palette</span>
+                    Mudar Tema
+                </button>
+            </div>
+
             <div class="action-row">
-                <button class="btn-action btn-pen" onclick="toggleDrawingMode(true)"><span class="material-icons">edit</span> CANETA</button>
-                <button class="btn-action btn-reset" onclick="triggerReset()"><span class="material-icons">restart_alt</span> RESET</button>
-                <button class="btn-action btn-theme" onclick="triggerTheme()"><span class="material-icons">palette</span> TEMA</button>
+                <button class="btn-action btn-pen" onclick="toggleDrawingMode(true)">
+                    <span class="material-icons">edit</span> CANETA
+                </button>
+                <button class="btn-action btn-reset" onclick="triggerReset()">
+                    <span class="material-icons">restart_alt</span> RESET
+                </button>
             </div>
         </footer>
     </div>
@@ -54,5 +94,15 @@
     </div>
 
     <script src="{{ url_for('static', filename='js/remote.js') }}"></script>
+    <script>
+        function cycleBg() {
+            socket.emit('action_cycle_bg');
+            if(navigator.vibrate) navigator.vibrate(30);
+        }
+        function cycleTheme() {
+            socket.emit('action_cycle_theme');
+            if(navigator.vibrate) navigator.vibrate(30);
+        }
+    </script>
 </body>
 </html>

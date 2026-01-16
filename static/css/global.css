@@ -18,7 +18,7 @@
     font-style: italic;
     background: linear-gradient(90deg, #FFD700 0%, #FFF 50%, #FFD700 100%);
     background-size: 200% auto;
-    -webkit-background-clip: text;
+    background-clip: text;
     -webkit-text-fill-color: transparent;
     animation: shimmer 3s linear infinite;
     display: inline-block;

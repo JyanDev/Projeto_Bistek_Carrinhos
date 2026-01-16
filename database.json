@@ -2,7 +2,8 @@
   "users": {
     "admin": {
       "nome": "Administrador do Sistema",
-      "tipo": "admin"
+      "tipo": "admin",
+      "cpf_display": "admin"
     },
     "00000000000": {
       "nome": "Cliente Teste",
@@ -20,6 +21,10 @@
     "03873163020": {
       "nome": "Luisa Fonseca Rodrigues",
       "tipo": "Funcionário - OP CAIXA (Mat: 260066)"
+    },
+    "03873165020": {
+      "nome": "Luisa Fonseca Rodrigues",
+      "tipo": "Funcionário - Operador (Mat: 260066)"
     }
   },
   "products": [

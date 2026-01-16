@@ -53,7 +53,9 @@ cart_state = {
     "total": 0.00,
     "theme": "green",
     "moving": {"UP": False, "DOWN": False, "LEFT": False, "RIGHT": False},
-    "drawings": []
+    "drawings": [],
+    "theme": "green",      # Opções: green, red, purple
+    "bg_mode": "image"
 }
 
 thread = None
@@ -78,7 +80,9 @@ def background_physics():
             "cart": cart_state["cart_items"],
             "total": cart_state["total"],
             "user": cart_state["user"],
-            "drawings": cart_state["drawings"]
+            "drawings": cart_state["drawings"],
+            "theme": cart_state["theme"],
+            "bg_mode": cart_state.get("bg_mode", "image")
         }
 
         # 3. Envia Broadcast
@@ -202,7 +206,28 @@ def start_tunnel():
         subprocess.Popen(["cloudflared", "tunnel", "--url", "http://localhost:5000"])
     except:
         print("⚠️ Cloudflared não encontrado.")
+# NOVO: Alavanca de Fundo (Imagem vs Branco)
+@socketio.on('action_cycle_theme')
+def cycle_theme():
+    # Ciclo: Green -> Red -> Purple -> Green
+    modes = ['green', 'red', 'purple']
+    current = cart_state['theme']
+    try:
+        next_idx = (modes.index(current) + 1) % len(modes)
+    except:
+        next_idx = 0
+    cart_state['theme'] = modes[next_idx]
 
+@socketio.on('action_cycle_bg')
+def cycle_bg():
+    # Ciclo: Image -> Clean -> Dark -> Image
+    modes = ['image', 'clean', 'dark']
+    current = cart_state['bg_mode']
+    try:
+        next_idx = (modes.index(current) + 1) % len(modes)
+    except:
+        next_idx = 0
+    cart_state['bg_mode'] = modes[next_idx]
 @socketio.on('draw_add')
 def handle_draw_add(data):
     """Recebe: {'x': 10, 'y': 20, 'color': '#ff0000'}"""
@@ -224,7 +249,8 @@ if __name__ == '__main__':
   "users": {
     "admin": {
       "nome": "Administrador do Sistema",
-      "tipo": "admin"
+      "tipo": "admin",
+      "cpf_display": "admin"
     },
     "00000000000": {
       "nome": "Cliente Teste",
@@ -242,6 +268,10 @@ if __name__ == '__main__':
     "03873163020": {
       "nome": "Luisa Fonseca Rodrigues",
       "tipo": "Funcionário - OP CAIXA (Mat: 260066)"
+    },
+    "03873165020": {
+      "nome": "Luisa Fonseca Rodrigues",
+      "tipo": "Funcionário - Operador (Mat: 260066)"
     }
   },
   "products": [
@@ -511,426 +541,947 @@ class GPSEngine:
 {"dimensions": {"width": 30, "height": 18}, "tile_size": 40, "grid": [[{"type": 1, "zone_id": 1}, {"type": 1, "zone_id": 1}, {"type": 1, "zone_id": 1}, {"type": 1, "zone_id": 1}, {"type": 1, "zone_id": 1}, {"type": 1, "zone_id": 1}, {"type": 1, "zone_id": 1}, {"type": 1, "zone_id": 1}, {"type": 1, "zone_id": 1}, {"type": 1, "zone_id": 1}, {"type": 1, "zone_id": 1}, {"type": 1, "zone_id": 1}, {"type": 1, "zone_id": 0}, {"type": 1, "zone_id": 0}, {"type": 1, "zone_id": 0}, {"type": 3, "zone_id": 0}, {"type": 1, "zone_id": 0}, {"type": 1, "zone_id": 0}], [{"type": 1, "zone_id": 1}, {"type": 2, "zone_id": 1}, {"type": 2, "zone_id": 1}, {"type": 2, "zone_id": 1}, {"type": 2, "zone_id": 1}, {"type": 2, "zone_id": 1}, {"type": 2, "zone_id": 1}, {"type": 2, "zone_id": 1}, {"type": 2, "zone_id": 1}, {"type": 2, "zone_id": 1}, {"type": 2, "zone_id": 1}, {"type": 2, "zone_id": 1}, {"type": 1, "zone_id": 0}, {"type": 2, "zone_id": 12}, {"type": 2, "zone_id": 12}, {"type": 2, "zone_id": 12}, {"type": 2, "zone_id": 12}, {"type": 1, "zone_id": 0}], [{"type": 1, "zone_id": 1}, {"type": 2, "zone_id": 1}, {"type": 2, "zone_id": 1}, {"type": 2, "zone_id": 1}, {"type": 2, "zone_id": 1}, {"type": 2, "zone_id": 1}, {"type": 2, "zone_id": 1}, {"type": 2, "zone_id": 1}, {"type": 2, "zone_id": 1}, {"type": 2, "zone_id": 1}, {"type": 2, "zone_id": 1}, {"type": 2, "zone_id": 1}, {"type": 1, "zone_id": 0}, {"type": 2, "zone_id": 12}, {"type": 2, "zone_id": 12}, {"type": 2, "zone_id": 12}, {"type": 2, "zone_id": 12}, {"type": 3, "zone_id": 0}], [{"type": 1, "zone_id": 1}, {"type": 2, "zone_id": 1}, {"type": 3, "zone_id": 1}, {"type": 1, "zone_id": 1}, {"type": 1, "zone_id": 1}, {"type": 3, "zone_id": 1}, {"type": 1, "zone_id": 1}, {"type": 1, "zone_id": 1}, {"type": 3, "zone_id": 1}, {"type": 2, "zone_id": 1}, {"type": 2, "zone_id": 1}, {"type": 2, "zone_id": 1}, {"type": 1, "zone_id": 0}, {"type": 2, "zone_id": 12}, {"type": 2, "zone_id": 12}, {"type": 2, "zone_id": 12}, {"type": 2, "zone_id": 12}, {"type": 2, "zone_id": 0}], [{"type": 1, "zone_id": 1}, {"type": 2, "zone_id": 1}, {"type": 2, "zone_id": 1}, {"type": 2, "zone_id": 1}, {"type": 2, "zone_id": 1}, {"type": 2, "zone_id": 1}, {"type": 2, "zone_id": 1}, {"type": 2, "zone_id": 1}, {"type": 2, "zone_id": 1}, {"type": 2, "zone_id": 1}, {"type": 2, "zone_id": 1}, {"type": 2, "zone_id": 1}, {"type": 1, "zone_id": 0}, {"type": 2, "zone_id": 12}, {"type": 2, "zone_id": 12}, {"type": 2, "zone_id": 12}, {"type": 2, "zone_id": 12}, {"type": 2, "zone_id": 0}], [{"type": 1, "zone_id": 1}, {"type": 2, "zone_id": 1}, {"type": 3, "zone_id": 1}, {"type": 1, "zone_id": 1}, {"type": 1, "zone_id": 1}, {"type": 3, "zone_id": 1}, {"type": 1, "zone_id": 1}, {"type": 1, "zone_id": 1}, {"type": 3, "zone_id": 1}, {"type": 2, "zone_id": 1}, {"type": 2, "zone_id": 1}, {"type": 2, "zone_id": 1}, {"type": 1, "zone_id": 0}, {"type": 1, "zone_id": 0}, {"type": 3, "zone_id": 0}, {"type": 2, "zone_id": 12}, {"type": 2, "zone_id": 12}, {"type": 2, "zone_id": 0}], [{"type": 1, "zone_id": 1}, {"type": 2, "zone_id": 1}, {"type": 2, "zone_id": 1}, {"type": 2, "zone_id": 1}, {"type": 2, "zone_id": 1}, {"type": 2, "zone_id": 1}, {"type": 2, "zone_id": 1}, {"type": 2, "zone_id": 1}, {"type": 2, "zone_id": 1}, {"type": 2, "zone_id": 1}, {"type": 2, "zone_id": 1}, {"type": 2, "zone_id": 1}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}], [{"type": 1, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}], [{"type": 1, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 1, "zone_id": 0}], [{"type": 1, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 3, "zone_id": 0}, {"type": 1, "zone_id": 0}, {"type": 3, "zone_id": 0}, {"type": 1, "zone_id": 0}, {"type": 3, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 3, "zone_id": 0}, {"type": 1, "zone_id": 0}, {"type": 3, "zone_id": 0}, {"type": 1, "zone_id": 0}, {"type": 3, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 1, "zone_id": 0}], [{"type": 1, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 2}, {"type": 2, "zone_id": 2}, {"type": 2, "zone_id": 2}, {"type": 2, "zone_id": 2}, {"type": 2, "zone_id": 2}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 11}, {"type": 2, "zone_id": 11}, {"type": 2, "zone_id": 11}, {"type": 2, "zone_id": 11}, {"type": 2, "zone_id": 11}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 1, "zone_id": 0}], [{"type": 1, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 2}, {"type": 2, "zone_id": 2}, {"type": 2, "zone_id": 2}, {"type": 2, "zone_id": 2}, {"type": 2, "zone_id": 2}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 11}, {"type": 2, "zone_id": 11}, {"type": 2, "zone_id": 11}, {"type": 2, "zone_id": 11}, {"type": 2, "zone_id": 11}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 1, "zone_id": 0}], [{"type": 1, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 3, "zone_id": 0}, {"type": 1, "zone_id": 0}, {"type": 3, "zone_id": 0}, {"type": 1, "zone_id": 0}, {"type": 3, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 3, "zone_id": 0}, {"type": 1, "zone_id": 0}, {"type": 3, "zone_id": 0}, {"type": 1, "zone_id": 0}, {"type": 3, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 1, "zone_id": 0}], [{"type": 1, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 3}, {"type": 2, "zone_id": 3}, {"type": 2, "zone_id": 3}, {"type": 2, "zone_id": 3}, {"type": 2, "zone_id": 3}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 10}, {"type": 2, "zone_id": 10}, {"type": 2, "zone_id": 10}, {"type": 2, "zone_id": 10}, {"type": 2, "zone_id": 10}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 1, "zone_id": 0}], [{"type": 1, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 3}, {"type": 2, "zone_id": 3}, {"type": 2, "zone_id": 3}, {"type": 2, "zone_id": 3}, {"type": 2, "zone_id": 3}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 10}, {"type": 2, "zone_id": 10}, {"type": 2, "zone_id": 10}, {"type": 2, "zone_id": 10}, {"type": 2, "zone_id": 10}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 1, "zone_id": 0}], [{"type": 1, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 3, "zone_id": 0}, {"type": 1, "zone_id": 0}, {"type": 3, "zone_id": 0}, {"type": 1, "zone_id": 0}, {"type": 3, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 3, "zone_id": 0}, {"type": 1, "zone_id": 0}, {"type": 3, "zone_id": 0}, {"type": 1, "zone_id": 0}, {"type": 3, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 1, "zone_id": 0}], [{"type": 1, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 4}, {"type": 2, "zone_id": 4}, {"type": 2, "zone_id": 4}, {"type": 2, "zone_id": 4}, {"type": 2, "zone_id": 4}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 9}, {"type": 2, "zone_id": 9}, {"type": 2, "zone_id": 9}, {"type": 2, "zone_id": 9}, {"type": 2, "zone_id": 9}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 1, "zone_id": 0}], [{"type": 1, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 4}, {"type": 2, "zone_id": 4}, {"type": 2, "zone_id": 4}, {"type": 2, "zone_id": 4}, {"type": 2, "zone_id": 4}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 9}, {"type": 2, "zone_id": 9}, {"type": 2, "zone_id": 9}, {"type": 2, "zone_id": 9}, {"type": 2, "zone_id": 9}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 1, "zone_id": 0}], [{"type": 1, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 3, "zone_id": 0}, {"type": 1, "zone_id": 0}, {"type": 3, "zone_id": 0}, {"type": 1, "zone_id": 0}, {"type": 3, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 3, "zone_id": 0}, {"type": 1, "zone_id": 0}, {"type": 3, "zone_id": 0}, {"type": 1, "zone_id": 0}, {"type": 3, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 1, "zone_id": 0}], [{"type": 1, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 5}, {"type": 2, "zone_id": 5}, {"type": 2, "zone_id": 5}, {"type": 2, "zone_id": 5}, {"type": 2, "zone_id": 5}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 8}, {"type": 2, "zone_id": 8}, {"type": 2, "zone_id": 8}, {"type": 2, "zone_id": 8}, {"type": 2, "zone_id": 8}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 1, "zone_id": 0}], [{"type": 1, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 5}, {"type": 2, "zone_id": 5}, {"type": 2, "zone_id": 5}, {"type": 2, "zone_id": 5}, {"type": 2, "zone_id": 5}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 8}, {"type": 2, "zone_id": 8}, {"type": 2, "zone_id": 8}, {"type": 2, "zone_id": 8}, {"type": 2, "zone_id": 8}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 1, "zone_id": 0}], [{"type": 1, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 3, "zone_id": 0}, {"type": 1, "zone_id": 0}, {"type": 3, "zone_id": 0}, {"type": 1, "zone_id": 0}, {"type": 3, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 3, "zone_id": 0}, {"type": 1, "zone_id": 0}, {"type": 3, "zone_id": 0}, {"type": 1, "zone_id": 0}, {"type": 3, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 1, "zone_id": 0}], [{"type": 1, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 6}, {"type": 2, "zone_id": 6}, {"type": 2, "zone_id": 6}, {"type": 2, "zone_id": 6}, {"type": 2, "zone_id": 6}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 7}, {"type": 2, "zone_id": 7}, {"type": 2, "zone_id": 7}, {"type": 2, "zone_id": 7}, {"type": 2, "zone_id": 7}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}], [{"type": 1, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 6}, {"type": 2, "zone_id": 6}, {"type": 2, "zone_id": 6}, {"type": 2, "zone_id": 6}, {"type": 2, "zone_id": 6}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 7}, {"type": 2, "zone_id": 7}, {"type": 2, "zone_id": 7}, {"type": 2, "zone_id": 7}, {"type": 2, "zone_id": 7}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}], [{"type": 1, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 3, "zone_id": 0}, {"type": 1, "zone_id": 0}, {"type": 3, "zone_id": 0}, {"type": 1, "zone_id": 0}, {"type": 3, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 3, "zone_id": 0}, {"type": 1, "zone_id": 0}, {"type": 3, "zone_id": 0}, {"type": 1, "zone_id": 0}, {"type": 3, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}], [{"type": 1, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}], [{"type": 1, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}], [{"type": 1, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 1, "zone_id": 0}], [{"type": 1, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 1, "zone_id": 0}], [{"type": 1, "zone_id": 0}, {"type": 1, "zone_id": 0}, {"type": 1, "zone_id": 0}, {"type": 1, "zone_id": 0}, {"type": 1, "zone_id": 0}, {"type": 1, "zone_id": 0}, {"type": 1, "zone_id": 0}, {"type": 1, "zone_id": 0}, {"type": 1, "zone_id": 0}, {"type": 1, "zone_id": 0}, {"type": 1, "zone_id": 0}, {"type": 1, "zone_id": 0}, {"type": 1, "zone_id": 0}, {"type": 1, "zone_id": 0}, {"type": 1, "zone_id": 0}, {"type": 1, "zone_id": 0}, {"type": 1, "zone_id": 0}, {"type": 1, "zone_id": 0}]]}
 
 
-========== ARQUIVO: static/script.js ==========
-const socket = io();
-let mapData = null;
-// Coordenadas do Jogador
-let currentX = 0, currentY = 0, targetX = 0, targetY = 0;
+========== ARQUIVO: static/css/global.css ==========
+:root {
+    --bistek-green: #004B50;
+    --bistek-red: #d32f2f;
+    --bistek-gold: #FFD700;
+    --bg-dark: #121212;
+}
 
-// Elementos Gráficos
+* { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', sans-serif; }
+
+/* ANIMAÇÃO "WOW": Texto Dourado Brilhante (Clube) */
+@keyframes shimmer {
+    0% { background-position: -200% center; }
+    100% { background-position: 200% center; }
+}
+
+.clube-highlight {
+    font-weight: 900;
+    font-style: italic;
+    background: linear-gradient(90deg, #FFD700 0%, #FFF 50%, #FFD700 100%);
+    background-size: 200% auto;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    animation: shimmer 3s linear infinite;
+    display: inline-block;
+}
+
+/* Animação de Entrada (Fade In) */
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-entry { animation: fadeIn 0.5s ease-out forwards; }
+
+
+========== ARQUIVO: static/css/remote.css ==========
+:root { --btn-size: 85px; }
+
+body {
+    background-color: var(--bg-dark); color: white;
+    height: 100vh; width: 100vw; overflow: hidden;
+    display: flex; flex-direction: column; touch-action: none;
+}
+
+/* Header & Footer */
+header {
+    background: #1e1e1e; padding: 10px 15px; border-bottom: 2px solid #333;
+    display: flex; justify-content: space-between; align-items: center; height: 60px; flex-shrink: 0;
+}
+.control-footer {
+    background: #1e1e1e; padding: 20px; padding-bottom: 70px;
+    border-top-left-radius: 25px; border-top-right-radius: 25px;
+    display: flex; flex-direction: column; gap: 15px; flex-shrink: 0;
+}
+
+/* D-Pad */
+#control-mode { flex: 1; display: flex; flex-direction: column; justify-content: space-between; }
+.d-pad-container { flex: 1; display: flex; align-items: center; justify-content: center; }
+.d-pad-grid { display: grid; grid-template-columns: repeat(3, var(--btn-size)); grid-template-rows: repeat(3, var(--btn-size)); gap: 15px; }
+.d-btn {
+    width: 100%; height: 100%; background: #333; border-radius: 15px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 40px; color: #aaa; box-shadow: 0 6px 0 #222; transition: 0.1s;
+}
+.d-btn:active, .d-btn.active { background: var(--bistek-green); color: #fff; transform: translateY(6px); box-shadow: none; }
+
+/* Botões de Ação */
+.action-row { display: flex; gap: 10px; }
+.btn-action {
+    flex: 1; padding: 15px; border: none; border-radius: 12px; font-weight: bold; color: white;
+    display: flex; align-items: center; justify-content: center; gap: 8px; box-shadow: 0 4px 0 rgba(0,0,0,0.3);
+}
+.btn-action:active { transform: translateY(4px); box-shadow: none; }
+.btn-scan { background: #ff9800; color: #000; }
+.btn-pen { background: #9C27B0; }
+.btn-reset { background: var(--bistek-red); }
+.btn-theme { background: #444; }
+
+/* Draw Mode */
+#drawing-mode {
+    position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+    background: #111; z-index: 50; display: none; flex-direction: column;
+}
+.draw-viewport { flex: 1; position: relative; overflow: hidden; background: #000; display: flex; align-items: center; justify-content: center; }
+.transform-layer { width: 1280px; height: 800px; position: absolute; transform-origin: center center; background: #333; }
+iframe.mirror-frame { width: 100%; height: 100%; border: none; pointer-events: none; opacity: 0.8; }
+canvas.draw-canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; cursor: crosshair; }
+
+.draw-toolbar {
+    height: 100px; padding-bottom: 30px; background: #222;
+    display: flex; align-items: center; justify-content: space-around;
+    border-top: 1px solid #444; flex-shrink: 0;
+}
+.tool-btn { width: 50px; height: 50px; border-radius: 50%; border: none; background: #333; color: #fff; font-size: 24px; }
+.tool-btn.active { background: var(--bistek-gold); color: #000; box-shadow: 0 0 10px var(--bistek-gold); }
+.tool-btn.danger { background: #550000; color: #ffaaaa; }
+
+.status-led { width: 12px; height: 12px; background: #444; border-radius: 50%; }
+.status-led.connected { background: #0f0; box-shadow: 0 0 10px #0f0; }
+
+#color-picker-wrapper { width: 40px; height: 40px; border-radius: 50%; overflow: hidden; border: 2px solid #fff; position: relative; }
+#color-input { position: absolute; top: -10px; left: -10px; width: 60px; height: 60px; }
+
+
+========== ARQUIVO: static/css/tablet.css ==========
+/* =========================================
+   SISTEMA DE TEMAS E CORES
+   ========================================= */
+:root {
+    /* Cores Base */
+    --primary-color: #004B50;  /* Verde Bistek */
+    --accent-color: #00b3b8;
+    --gold-color: #D4AF37;
+
+    --glass-bg: rgba(255, 255, 255, 0.85);
+    --text-color: #333;
+
+    --bezel-color: #1a1a1a;
+    --shadow-soft: 0 8px 32px 0 rgba(0, 0, 0, 0.15);
+}
+
+/* --- VARIAÇÕES DE TEMA --- */
+body.theme-red { --primary-color: #D32F2F; --accent-color: #FF5252; }
+body.theme-purple { --primary-color: #4A148C; --accent-color: #7C4DFF; --gold-color: #FFD700; }
+
+* { box-sizing: border-box; }
+
+body {
+    background: #111;
+    margin: 0; padding: 0;
+    width: 100vw; height: 100vh;
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    color: var(--text-color);
+    display: flex; align-items: center; justify-content: center;
+    overflow: hidden;
+    transition: background 0.5s;
+}
+
+/* =========================================
+   CONTAINER MESTRE
+   ========================================= */
+#app-container {
+    width: 1280px; height: 800px;
+    min-width: 1280px; min-height: 800px;
+    position: absolute; top: 50%; left: 50%;
+
+    /* MODO 1: IMAGEM (Padrão) */
+    background: linear-gradient(rgba(0,0,0,0.6), rgba(0,0,0,0.6)),
+                url('/static/ads/bg-tablet.jpg');
+    background-size: cover; background-position: center;
+
+    border: 16px solid var(--bezel-color);
+    border-radius: 40px;
+    box-shadow: inset 0 0 0 2px rgba(255,255,255,0.1), 0 30px 60px rgba(0,0,0,0.8);
+    overflow: hidden;
+
+    display: grid;
+    grid-template-columns: 290px 1fr 290px;
+    grid-template-rows: 90px 1fr 70px;
+    grid-template-areas: "header header header" "left center right" "footer footer footer";
+    gap: 15px; padding: 20px;
+    transition: background 0.5s ease;
+}
+
+/* =========================================
+   MODOS DE FUNDO (CORES E CONTRASTE)
+   ========================================= */
+
+/* --- MODO CLEAN (CLARO) --- */
+#app-container.bg-clean {
+    background: #f4f4f4;
+    box-shadow: 0 40px 100px rgba(0,0,0,0.2);
+    --text-color: #222;
+}
+#app-container.bg-clean .glass-panel,
+#app-container.bg-clean .hud-child {
+    background: #ffffff;
+    box-shadow: 0 5px 15px rgba(0,0,0,0.05);
+    border: 1px solid #ddd;
+}
+
+/* [CORREÇÃO] Força texto ESCURO nestes elementos no modo Clean */
+#app-container.bg-clean .store-info,
+#app-container.bg-clean .u-doc,
+#app-container.bg-clean .cart-item,
+#app-container.bg-clean .item-left,
+#app-container.bg-clean .clock-area,
+#app-container.bg-clean footer,
+#app-container.bg-clean .location-card, /* <--- ADICIONADO AQUI */
+#app-container.bg-clean .location-card h2,
+#app-container.bg-clean .location-card small {
+    color: #222 !important;
+}
+
+/* Exceção: Elementos que MANTÊM fundo colorido precisam de texto branco */
+#app-container.bg-clean .cart-total-area,
+#app-container.bg-clean .clube-badge {
+    color: white !important;
+}
+
+/* --- MODO DARK (ESCURO) --- */
+#app-container.bg-dark {
+    background: #121212;
+    box-shadow: 0 0 50px rgba(0,0,0,0.8);
+    border-color: #333;
+    --text-color: #fff;
+}
+#app-container.bg-dark .glass-panel,
+#app-container.bg-dark .hud-child {
+    background: rgba(30, 30, 30, 0.95);
+    border: 1px solid #444;
+    box-shadow: none;
+}
+/* Força texto BRANCO no modo Dark */
+#app-container.bg-dark .store-info,
+#app-container.bg-dark .u-doc,
+#app-container.bg-dark .cart-item,
+#app-container.bg-dark .item-left,
+#app-container.bg-dark .clock-area,
+#app-container.bg-dark h1,
+#app-container.bg-dark span,
+#app-container.bg-dark footer,
+#app-container.bg-dark .location-card {
+    color: #ffffff !important;
+    text-shadow: 0 1px 2px rgba(0,0,0,0.8); /* Sombra para leitura */
+}
+#app-container.bg-dark .cart-header { background: #222; }
+#app-container.bg-dark .search-wrapper input { background: #333; color: white; border-color: #555; }
+#app-container.bg-dark .cart-item { border-bottom: 1px solid #444; }
+#app-container.bg-dark .offer-box { background: #222; border-left-color: var(--gold-color); color: white; }
+
+/* =========================================
+   ELEMENTOS DE UI (PADRÃO)
+   ========================================= */
+.glass-panel {
+    background: var(--glass-bg);
+    backdrop-filter: var(--glass-blur);
+    -webkit-backdrop-filter: var(--glass-blur);
+    border: 1px solid var(--glass-border);
+    border-radius: 20px;
+    box-shadow: var(--shadow-soft);
+    display: flex; overflow: hidden;
+    min-height: 0; min-width: 0;
+}
+
+header.glass-panel { grid-area: header; align-items: center; justify-content: space-between; padding: 0 25px; z-index: 10; }
+.cart-panel { grid-area: left; flex-direction: column; }
+.hud-panel { grid-area: right; background: transparent; box-shadow: none; border: none; backdrop-filter: none; display: flex; flex-direction: column; gap: 15px; height: 100%; }
+.hud-child { background: var(--glass-bg); backdrop-filter: var(--glass-blur); border: 1px solid var(--glass-border); border-radius: 18px; flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; position: relative; overflow: hidden; min-height: 0; }
+footer.glass-panel { grid-area: footer; align-items: center; justify-content: space-between; padding: 0 25px; }
+
+/* Showcase (Slides) */
+.showcase-stage {
+    grid-area: center; background: #000;
+    border: 2px solid rgba(255,255,255,0.1);
+    position: relative; box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+    border-radius: 20px; overflow: hidden; display: block; height: 100%; width: 100%;
+}
+.hero-content { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; opacity: 1; transition: opacity 0.5s; z-index: 1; }
+.hero-overlay { position: absolute; bottom: 0; left: 0; width: 100%; background: linear-gradient(to top, rgba(0,0,0,0.9), transparent); padding: 40px 20px; color: white; z-index: 2; }
+
+/* Header Itens */
+.brand-area h1 { margin: 0; display: flex; align-items: center; gap: 10px; font-size: 24px; color: var(--primary-color); }
+.clube-badge {
+    background: linear-gradient(110deg, #b88a00, var(--gold-color), #b88a00); background-size: 200%;
+    color: white; padding: 5px 14px; border-radius: 20px; font-size: 14px; font-weight: 900;
+    box-shadow: 0 0 15px rgba(255, 215, 0, 0.3); animation: shimmerGold 3s linear infinite;
+}
+.store-info { display: flex; flex-direction: column; align-items: center; color: #444; line-height: 1.2; }
+.store-id { font-weight: 900; color: var(--primary-color); font-size: 13px; letter-spacing: 1px; }
+.store-addr { font-size: 11px; opacity: 0.8; }
+
+.user-pill { display: flex; align-items: center; gap: 12px; }
+.avatar-circle { width: 42px; height: 42px; background: var(--primary-color); border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; }
+.user-data-col { display: flex; flex-direction: column; }
+.u-name { font-weight: 800; font-size: 15px; color: var(--primary-color); line-height: 1.2; }
+.u-doc { font-size: 11px; color: #555; background: rgba(0,0,0,0.05); padding: 2px 6px; border-radius: 4px; margin-top: 2px; }
+
+/* Carrinho */
+.cart-header { padding: 12px 15px; background: rgba(0,0,0,0.05); color: var(--primary-color); font-weight: 700; display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; }
+.cart-title-group { display: flex; align-items: center; gap: 8px; }
+.search-wrapper { position: relative; width: 55%; }
+.search-wrapper input { width: 100%; padding: 6px 30px 6px 10px; border-radius: 15px; border: 1px solid rgba(0,0,0,0.1); font-size: 12px; }
+.search-icon { position: absolute; right: 8px; top: 50%; transform: translateY(-50%); font-size: 16px; color: #999; pointer-events: none; }
+
+.cart-items { flex: 1; overflow-y: auto; }
+.cart-item { display: flex; justify-content: space-between; padding: 12px 20px; border-bottom: 1px solid rgba(0,0,0,0.05); animation: slideInLeft 0.3s; color: var(--text-color); }
+.item-number { font-weight: 900; color: var(--primary-color); min-width: 20px; }
+.item-name { font-weight: 500; }
+.item-right { display: flex; align-items: center; gap: 15px; }
+.cart-total-area { background: var(--primary-color); color: white; padding: 15px; text-align: center; flex-shrink: 0; }
+
+/* Widgets */
+/* No modo padrão (Imagem), o card é colorido com texto branco */
+.location-card { background: var(--primary-color); color: white; text-align: center; width: 100%; height: 100%; justify-content: center; }
+.offer-box { background: linear-gradient(135deg, #fff, #f8f8f8); border-left: 6px solid var(--gold-color); padding: 15px; width: 100%; height: 100%; justify-content: center; }
+
+.map-widget { background: #fff; padding: 0; width: 100%; height: 100%; }
+#map-canvas { width: 100%; height: 100%; object-fit: contain; }
+
+/* Footer */
+.status-pill { display: flex; align-items: center; gap: 8px; background: rgba(0,0,0,0.1); padding: 6px 14px; border-radius: 20px; font-weight: bold; font-size: 12px; color: var(--text-color); }
+.dot.online { background: #00E676; box-shadow: 0 0 8px #00E676; }
+.dot.offline { background: #ff0000; }
+.clock-area { color: var(--text-color); text-align: right; }
+.clock-time { font-weight: 800; font-size: 20px; display: flex; align-items: center; gap: 5px; }
+.clock-countdown { font-size: 11px; color: var(--bistek-red); font-weight: bold; margin-top: 2px; text-transform: uppercase; letter-spacing: 0.5px; }
+
+/* Login */
+#login-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); backdrop-filter: blur(15px); z-index: 9999; display: flex; align-items: center; justify-content: center; }
+.auth-container { background: rgba(255,255,255,0.98); padding: 40px; width: 420px; border-radius: 30px; box-shadow: 0 25px 80px rgba(0,0,0,0.4); }
+.auth-view { display: flex; flex-direction: column; gap: 15px; animation: fadeIn 0.4s ease; }
+.hidden { display: none !important; }
+.auth-header h2 { margin: 0; color: var(--primary-color); font-size: 26px; }
+.auth-header p { margin: 5px 0 15px 0; color: #666; font-size: 14px; }
+.input-group label { font-size: 11px; font-weight: bold; color: #888; text-transform: uppercase; margin-left: 12px; margin-bottom: 4px; display: block; }
+.input-group input { width: 100%; padding: 14px 18px; border-radius: 12px; border: 2px solid #eee; font-size: 16px; outline: none; transition: 0.3s; background: #fcfcfc; }
+.input-group input:focus { border-color: var(--primary-color); background: white; }
+.checkbox-wrapper { display: flex; align-items: center; gap: 10px; margin: 10px 0; padding: 10px; background: #f0f8f8; border-radius: 10px; cursor: pointer; }
+.checkbox-wrapper input { width: 18px; height: 18px; accent-color: var(--primary-color); cursor: pointer; }
+.checkbox-wrapper span { font-weight: 600; font-size: 14px; color: var(--primary-color); }
+.btn-primary { background: var(--primary-color); color: white; border: none; padding: 15px; border-radius: 12px; font-weight: bold; cursor: pointer; width: 100%; margin-top: 10px; }
+.btn-link { background: none; border: none; color: var(--primary-color); text-decoration: underline; cursor: pointer; margin-top: 10px; width: 100%; }
+
+#overlay-canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 999; pointer-events: none; border-radius: 20px; }
+
+@keyframes shimmerGold { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+@keyframes slideInLeft { from { opacity: 0; transform: translateX(-20px); } to { opacity: 1; transform: translateX(0); } }
+@keyframes fadeIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
+
+
+========== ARQUIVO: static/js/remote.js ==========
+const socket = io();
+const led = document.getElementById('statusLed');
+
+socket.on('connect', () => { led.classList.add('connected'); vibrate(50); });
+socket.on('disconnect', () => led.classList.remove('connected'));
+
+// Hack para espelhamento limpo
+const iframe = document.getElementById('mirrorIframe');
+iframe.onload = function() {
+    try {
+        const doc = iframe.contentDocument || iframe.contentWindow.document;
+        const overlay = doc.getElementById('login-overlay');
+        if(overlay) overlay.style.display = 'none';
+        doc.body.style.cursor = 'none';
+    } catch (e) {}
+};
+
+// --- D-PAD ---
+document.querySelectorAll('.d-btn').forEach(btn => {
+    const key = btn.getAttribute('data-key');
+    if(!key) return;
+    const press = (e) => { if(e.type === 'touchstart') e.preventDefault(); btn.classList.add('active'); vibrate(15); socket.emit('input_change', { key: key, pressed: true }); };
+    const release = (e) => { if(e.type === 'touchend') e.preventDefault(); btn.classList.remove('active'); socket.emit('input_change', { key: key, pressed: false }); };
+
+    btn.addEventListener('touchstart', press, { passive: false });
+    btn.addEventListener('touchend', release, { passive: false });
+    btn.addEventListener('mousedown', press);
+    btn.addEventListener('mouseup', release);
+    btn.addEventListener('mouseleave', release);
+});
+
+// Ações
+window.triggerScan = function() { socket.emit('action_scan'); vibrate([30, 50]); }
+window.triggerReset = function() { if(confirm("Resetar?")) socket.emit('action_reset'); }
+window.triggerTheme = function() { socket.emit('action_theme'); }
+
+// --- DESENHO (INTERPOLADO) ---
+const drawingModeEl = document.getElementById('drawing-mode');
+const layer = document.getElementById('layer');
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+const viewport = document.getElementById('viewport');
+
+let currentTool = 'draw', scale = 1, pX = 0, pY = 0;
+let isDragging = false, startDist = 0, lastX = 0, lastY = 0;
+
+window.toggleDrawingMode = function(show) {
+    drawingModeEl.style.display = show ? 'flex' : 'none';
+    if(show) {
+        // Fit inicial
+        scale = Math.min(viewport.clientWidth / 1280, viewport.clientHeight / 800) * 0.95;
+        pX = 0; pY = 0; updateTransform();
+        if(iframe.contentWindow) iframe.contentWindow.location.reload();
+    }
+}
+
+window.setTool = function(tool) {
+    currentTool = tool;
+    document.getElementById('btn-draw').className = `tool-btn ${tool==='draw'?'active':''}`;
+    document.getElementById('btn-move').className = `tool-btn ${tool==='move'?'active':''}`;
+}
+
+window.clearDrawings = function() { socket.emit('draw_clear'); ctx.clearRect(0, 0, canvas.width, canvas.height); vibrate(50); }
+
+function updateTransform() { layer.style.transform = `translate(${pX}px, ${pY}px) scale(${scale})`; }
+function getDist(t1, t2) { return Math.hypot(t1.clientX - t2.clientX, t1.clientY - t2.clientY); }
+function getCanvasPoint(touch) {
+    const rect = canvas.getBoundingClientRect();
+    return {
+        x: (touch.clientX - rect.left) * (canvas.width / rect.width),
+        y: (touch.clientY - rect.top) * (canvas.height / rect.height)
+    };
+}
+function vibrate(ptrn) { if(navigator.vibrate) navigator.vibrate(ptrn); }
+
+// Eventos Touch Desenho
+viewport.addEventListener('touchstart', (e) => {
+    e.preventDefault();
+    if (e.touches.length === 2) { startDist = getDist(e.touches[0], e.touches[1]); isDragging = false; return; }
+    if (currentTool === 'move') { isDragging = true; lastX = e.touches[0].clientX; lastY = e.touches[0].clientY; }
+    else if (currentTool === 'draw') {
+        const p = getCanvasPoint(e.touches[0]);
+        lastX = p.x; lastY = p.y;
+        drawLocal(p.x, p.y, p.x, p.y);
+        emitInterpolated(p.x, p.y, p.x, p.y);
+    }
+}, { passive: false });
+
+viewport.addEventListener('touchmove', (e) => {
+    e.preventDefault();
+    if (e.touches.length === 2) {
+        const newDist = getDist(e.touches[0], e.touches[1]);
+        scale = Math.min(Math.max(scale * (newDist / startDist), 0.2), 3.0);
+        startDist = newDist; updateTransform(); return;
+    }
+    if (currentTool === 'move' && isDragging) {
+        pX += e.touches[0].clientX - lastX; pY += e.touches[0].clientY - lastY;
+        lastX = e.touches[0].clientX; lastY = e.touches[0].clientY;
+        updateTransform();
+    } else if (currentTool === 'draw') {
+        const p = getCanvasPoint(e.touches[0]);
+        drawLocal(lastX, lastY, p.x, p.y);
+        emitInterpolated(lastX, lastY, p.x, p.y);
+        lastX = p.x; lastY = p.y;
+    }
+}, { passive: false });
+
+viewport.addEventListener('touchend', () => { isDragging = false; });
+
+function drawLocal(x1, y1, x2, y2) {
+    ctx.beginPath(); ctx.strokeStyle = document.getElementById('color-input').value;
+    ctx.lineWidth = 5; ctx.lineCap = "round"; ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+}
+function emitInterpolated(x1, y1, x2, y2) {
+    const dist = Math.hypot(x2 - x1, y2 - y1);
+    const steps = Math.ceil(dist / 5);
+    const color = document.getElementById('color-input').value;
+    for (let i = 1; i <= steps; i++) {
+        const t = i / steps;
+        socket.emit('draw_add', { x: (x1+(x2-x1)*t)/1280, y: (y1+(y2-y1)*t)/800, color: color });
+    }
+}
+
+
+========== ARQUIVO: static/js/tablet.js ==========
+// ===========================================
+// 1. CONFIGURAÇÃO DE CONEXÃO INTELIGENTE
+// ===========================================
+// Agora ele tenta conectar no mesmo link que você abriu no navegador
+const SOCKET_URL = window.location.origin;
+
+let socket = null;
+let isOfflineMode = false;
+let connectionTimeout = null;
+
+// Elementos Globais
 const mapCanvas = document.getElementById('map-canvas');
 const overlayCanvas = document.getElementById('overlay-canvas');
 const mapCtx = mapCanvas ? mapCanvas.getContext('2d') : null;
 const overlayCtx = overlayCanvas ? overlayCanvas.getContext('2d') : null;
 
-// =========================================================
-// 1. SOCKETS & CORE (Atualizações do Servidor)
-// =========================================================
-socket.on('update_state', (data) => {
-    // 1. Infos de Texto
-    const elLoc = document.getElementById('location-name');
-    const elOffer = document.getElementById('offer-text');
-    if (elLoc) elLoc.innerText = data.setor;
-    if (elOffer) elOffer.innerText = data.oferta;
+// Estados
+let mapData = null;
+let currentX = 0, currentY = 0, targetX = 0, targetY = 0;
+let lastCartJSON = "";
 
-    // 2. Tema
-    if (data.theme === 'red') document.body.classList.add('theme-red');
-    else document.body.classList.remove('theme-red');
+// Variáveis OFFLINE (Simulação)
+let simX = 15, simY = 16; // Posição inicial no meio dos corredores
+let simCart = [];
+const keysPressed = { UP: false, DOWN: false, LEFT: false, RIGHT: false };
 
-    // 3. Carrinho
-    renderCart(data.cart, data.total);
+// USUÁRIO PADRÃO (OFFLINE)
+const OFFLINE_USER = {
+    nome: "Sem nome (Modo Offline)",
+    cpf_display: "123.456.789-01",
+    tipo: "Cliente - Acesso Local"
+};
 
-    // 4. Desenhos no Overlay (Riscando a tela toda)
-    renderOverlay(data.drawings || []);
+// MAPA REAL (Cópia exata do seu JSON para garantir fidelidade offline)
+const REAL_MAP_DATA = {
+    "width": 30, "height": 18,
+    "grid": [[{"type": 1, "zone_id": 1}, {"type": 1, "zone_id": 1}, {"type": 1, "zone_id": 1}, {"type": 1, "zone_id": 1}, {"type": 1, "zone_id": 1}, {"type": 1, "zone_id": 1}, {"type": 1, "zone_id": 1}, {"type": 1, "zone_id": 1}, {"type": 1, "zone_id": 1}, {"type": 1, "zone_id": 1}, {"type": 1, "zone_id": 1}, {"type": 1, "zone_id": 1}, {"type": 1, "zone_id": 0}, {"type": 1, "zone_id": 0}, {"type": 1, "zone_id": 0}, {"type": 3, "zone_id": 0}, {"type": 1, "zone_id": 0}, {"type": 1, "zone_id": 0}], [{"type": 1, "zone_id": 1}, {"type": 2, "zone_id": 1}, {"type": 2, "zone_id": 1}, {"type": 2, "zone_id": 1}, {"type": 2, "zone_id": 1}, {"type": 2, "zone_id": 1}, {"type": 2, "zone_id": 1}, {"type": 2, "zone_id": 1}, {"type": 2, "zone_id": 1}, {"type": 2, "zone_id": 1}, {"type": 2, "zone_id": 1}, {"type": 2, "zone_id": 1}, {"type": 1, "zone_id": 0}, {"type": 2, "zone_id": 12}, {"type": 2, "zone_id": 12}, {"type": 2, "zone_id": 12}, {"type": 2, "zone_id": 12}, {"type": 1, "zone_id": 0}], [{"type": 1, "zone_id": 1}, {"type": 2, "zone_id": 1}, {"type": 2, "zone_id": 1}, {"type": 2, "zone_id": 1}, {"type": 2, "zone_id": 1}, {"type": 2, "zone_id": 1}, {"type": 2, "zone_id": 1}, {"type": 2, "zone_id": 1}, {"type": 2, "zone_id": 1}, {"type": 2, "zone_id": 1}, {"type": 2, "zone_id": 1}, {"type": 2, "zone_id": 1}, {"type": 1, "zone_id": 0}, {"type": 2, "zone_id": 12}, {"type": 2, "zone_id": 12}, {"type": 2, "zone_id": 12}, {"type": 2, "zone_id": 12}, {"type": 3, "zone_id": 0}], [{"type": 1, "zone_id": 1}, {"type": 2, "zone_id": 1}, {"type": 3, "zone_id": 1}, {"type": 1, "zone_id": 1}, {"type": 1, "zone_id": 1}, {"type": 3, "zone_id": 1}, {"type": 1, "zone_id": 1}, {"type": 1, "zone_id": 1}, {"type": 3, "zone_id": 1}, {"type": 2, "zone_id": 1}, {"type": 2, "zone_id": 1}, {"type": 2, "zone_id": 1}, {"type": 1, "zone_id": 0}, {"type": 2, "zone_id": 12}, {"type": 2, "zone_id": 12}, {"type": 2, "zone_id": 12}, {"type": 2, "zone_id": 12}, {"type": 2, "zone_id": 0}], [{"type": 1, "zone_id": 1}, {"type": 2, "zone_id": 1}, {"type": 2, "zone_id": 1}, {"type": 2, "zone_id": 1}, {"type": 2, "zone_id": 1}, {"type": 2, "zone_id": 1}, {"type": 2, "zone_id": 1}, {"type": 2, "zone_id": 1}, {"type": 2, "zone_id": 1}, {"type": 2, "zone_id": 1}, {"type": 2, "zone_id": 1}, {"type": 2, "zone_id": 1}, {"type": 1, "zone_id": 0}, {"type": 2, "zone_id": 12}, {"type": 2, "zone_id": 12}, {"type": 2, "zone_id": 12}, {"type": 2, "zone_id": 12}, {"type": 2, "zone_id": 0}], [{"type": 1, "zone_id": 1}, {"type": 2, "zone_id": 1}, {"type": 3, "zone_id": 1}, {"type": 1, "zone_id": 1}, {"type": 1, "zone_id": 1}, {"type": 3, "zone_id": 1}, {"type": 1, "zone_id": 1}, {"type": 1, "zone_id": 1}, {"type": 3, "zone_id": 1}, {"type": 2, "zone_id": 1}, {"type": 2, "zone_id": 1}, {"type": 2, "zone_id": 1}, {"type": 1, "zone_id": 0}, {"type": 1, "zone_id": 0}, {"type": 3, "zone_id": 0}, {"type": 2, "zone_id": 12}, {"type": 2, "zone_id": 12}, {"type": 2, "zone_id": 0}], [{"type": 1, "zone_id": 1}, {"type": 2, "zone_id": 1}, {"type": 2, "zone_id": 1}, {"type": 2, "zone_id": 1}, {"type": 2, "zone_id": 1}, {"type": 2, "zone_id": 1}, {"type": 2, "zone_id": 1}, {"type": 2, "zone_id": 1}, {"type": 2, "zone_id": 1}, {"type": 2, "zone_id": 1}, {"type": 2, "zone_id": 1}, {"type": 2, "zone_id": 1}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}], [{"type": 1, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}], [{"type": 1, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 1, "zone_id": 0}], [{"type": 1, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 3, "zone_id": 0}, {"type": 1, "zone_id": 0}, {"type": 3, "zone_id": 0}, {"type": 1, "zone_id": 0}, {"type": 3, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 3, "zone_id": 0}, {"type": 1, "zone_id": 0}, {"type": 3, "zone_id": 0}, {"type": 1, "zone_id": 0}, {"type": 3, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 1, "zone_id": 0}], [{"type": 1, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 2}, {"type": 2, "zone_id": 2}, {"type": 2, "zone_id": 2}, {"type": 2, "zone_id": 2}, {"type": 2, "zone_id": 2}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 11}, {"type": 2, "zone_id": 11}, {"type": 2, "zone_id": 11}, {"type": 2, "zone_id": 11}, {"type": 2, "zone_id": 11}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 1, "zone_id": 0}], [{"type": 1, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 2}, {"type": 2, "zone_id": 2}, {"type": 2, "zone_id": 2}, {"type": 2, "zone_id": 2}, {"type": 2, "zone_id": 2}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 11}, {"type": 2, "zone_id": 11}, {"type": 2, "zone_id": 11}, {"type": 2, "zone_id": 11}, {"type": 2, "zone_id": 11}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 1, "zone_id": 0}], [{"type": 1, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 3, "zone_id": 0}, {"type": 1, "zone_id": 0}, {"type": 3, "zone_id": 0}, {"type": 1, "zone_id": 0}, {"type": 3, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 3, "zone_id": 0}, {"type": 1, "zone_id": 0}, {"type": 3, "zone_id": 0}, {"type": 1, "zone_id": 0}, {"type": 3, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 1, "zone_id": 0}], [{"type": 1, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 3}, {"type": 2, "zone_id": 3}, {"type": 2, "zone_id": 3}, {"type": 2, "zone_id": 3}, {"type": 2, "zone_id": 3}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 10}, {"type": 2, "zone_id": 10}, {"type": 2, "zone_id": 10}, {"type": 2, "zone_id": 10}, {"type": 2, "zone_id": 10}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 1, "zone_id": 0}], [{"type": 1, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 3}, {"type": 2, "zone_id": 3}, {"type": 2, "zone_id": 3}, {"type": 2, "zone_id": 3}, {"type": 2, "zone_id": 3}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 10}, {"type": 2, "zone_id": 10}, {"type": 2, "zone_id": 10}, {"type": 2, "zone_id": 10}, {"type": 2, "zone_id": 10}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 1, "zone_id": 0}], [{"type": 1, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 3, "zone_id": 0}, {"type": 1, "zone_id": 0}, {"type": 3, "zone_id": 0}, {"type": 1, "zone_id": 0}, {"type": 3, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 3, "zone_id": 0}, {"type": 1, "zone_id": 0}, {"type": 3, "zone_id": 0}, {"type": 1, "zone_id": 0}, {"type": 3, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 1, "zone_id": 0}], [{"type": 1, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 4}, {"type": 2, "zone_id": 4}, {"type": 2, "zone_id": 4}, {"type": 2, "zone_id": 4}, {"type": 2, "zone_id": 4}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 9}, {"type": 2, "zone_id": 9}, {"type": 2, "zone_id": 9}, {"type": 2, "zone_id": 9}, {"type": 2, "zone_id": 9}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 1, "zone_id": 0}], [{"type": 1, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 4}, {"type": 2, "zone_id": 4}, {"type": 2, "zone_id": 4}, {"type": 2, "zone_id": 4}, {"type": 2, "zone_id": 4}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 9}, {"type": 2, "zone_id": 9}, {"type": 2, "zone_id": 9}, {"type": 2, "zone_id": 9}, {"type": 2, "zone_id": 9}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 1, "zone_id": 0}], [{"type": 1, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 3, "zone_id": 0}, {"type": 1, "zone_id": 0}, {"type": 3, "zone_id": 0}, {"type": 1, "zone_id": 0}, {"type": 3, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 3, "zone_id": 0}, {"type": 1, "zone_id": 0}, {"type": 3, "zone_id": 0}, {"type": 1, "zone_id": 0}, {"type": 3, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 1, "zone_id": 0}], [{"type": 1, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 5}, {"type": 2, "zone_id": 5}, {"type": 2, "zone_id": 5}, {"type": 2, "zone_id": 5}, {"type": 2, "zone_id": 5}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 8}, {"type": 2, "zone_id": 8}, {"type": 2, "zone_id": 8}, {"type": 2, "zone_id": 8}, {"type": 2, "zone_id": 8}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 1, "zone_id": 0}], [{"type": 1, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 5}, {"type": 2, "zone_id": 5}, {"type": 2, "zone_id": 5}, {"type": 2, "zone_id": 5}, {"type": 2, "zone_id": 5}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 8}, {"type": 2, "zone_id": 8}, {"type": 2, "zone_id": 8}, {"type": 2, "zone_id": 8}, {"type": 2, "zone_id": 8}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 1, "zone_id": 0}], [{"type": 1, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 3, "zone_id": 0}, {"type": 1, "zone_id": 0}, {"type": 3, "zone_id": 0}, {"type": 1, "zone_id": 0}, {"type": 3, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 3, "zone_id": 0}, {"type": 1, "zone_id": 0}, {"type": 3, "zone_id": 0}, {"type": 1, "zone_id": 0}, {"type": 3, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 1, "zone_id": 0}], [{"type": 1, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 6}, {"type": 2, "zone_id": 6}, {"type": 2, "zone_id": 6}, {"type": 2, "zone_id": 6}, {"type": 2, "zone_id": 6}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 7}, {"type": 2, "zone_id": 7}, {"type": 2, "zone_id": 7}, {"type": 2, "zone_id": 7}, {"type": 2, "zone_id": 7}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}], [{"type": 1, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 6}, {"type": 2, "zone_id": 6}, {"type": 2, "zone_id": 6}, {"type": 2, "zone_id": 6}, {"type": 2, "zone_id": 6}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 7}, {"type": 2, "zone_id": 7}, {"type": 2, "zone_id": 7}, {"type": 2, "zone_id": 7}, {"type": 2, "zone_id": 7}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}], [{"type": 1, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 3, "zone_id": 0}, {"type": 1, "zone_id": 0}, {"type": 3, "zone_id": 0}, {"type": 1, "zone_id": 0}, {"type": 3, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 3, "zone_id": 0}, {"type": 1, "zone_id": 0}, {"type": 3, "zone_id": 0}, {"type": 1, "zone_id": 0}, {"type": 3, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}], [{"type": 1, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}], [{"type": 1, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}], [{"type": 1, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 1, "zone_id": 0}], [{"type": 1, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 2, "zone_id": 0}, {"type": 1, "zone_id": 0}], [{"type": 1, "zone_id": 0}, {"type": 1, "zone_id": 0}, {"type": 1, "zone_id": 0}, {"type": 1, "zone_id": 0}, {"type": 1, "zone_id": 0}, {"type": 1, "zone_id": 0}, {"type": 1, "zone_id": 0}, {"type": 1, "zone_id": 0}, {"type": 1, "zone_id": 0}, {"type": 1, "zone_id": 0}, {"type": 1, "zone_id": 0}, {"type": 1, "zone_id": 0}, {"type": 1, "zone_id": 0}, {"type": 1, "zone_id": 0}, {"type": 1, "zone_id": 0}, {"type": 1, "zone_id": 0}, {"type": 1, "zone_id": 0}]]
+};
 
-    // 5. Mapa e Movimento
-    targetX = data.pos_x;
-    targetY = data.pos_y;
+// ===========================================
+// 2. CONEXÃO & DETECÇÃO DE REDE
+// ===========================================
+function initConnection() {
+    console.log(`🚀 Iniciando. Tentando: ${SOCKET_URL}`);
 
-    // Inicialização para evitar teleporte
-    if (currentX === 0 && currentY === 0) {
-        currentX = targetX;
-        currentY = targetY;
+    // Arquivo local -> Offline direto
+    if (window.location.protocol === 'file:') {
+        activateOfflineMode();
+        return;
     }
 
-    if (!mapData) loadMapData();
+    // Conecta na origem (localhost ou cloudflare)
+    socket = io(SOCKET_URL, {
+        reconnection: false,
+        timeout: 2000,
+        transports: ['websocket', 'polling']
+    });
+
+    // Se não conectar em 2.5s, assume que a rede caiu
+    connectionTimeout = setTimeout(() => {
+        if (!socket.connected) {
+            socket.close();
+            activateOfflineMode();
+        }
+    }, 2500);
+
+    // Sucesso
+    socket.on('connect', () => {
+        clearTimeout(connectionTimeout);
+        console.log("✅ Conectado Online!");
+        document.getElementById('connection-status').innerText = 'Online';
+        document.getElementById('status-dot').className = 'dot online';
+        document.getElementById('offline-banner').style.display = 'none';
+        setupSocketEvents();
+        loadMapData();
+    });
+
+    // Erro
+    socket.on('connect_error', () => {
+        clearTimeout(connectionTimeout);
+        activateOfflineMode();
+    });
+}
+
+// ===========================================
+// 3. MODO SOBREVIVÊNCIA (SIMULAÇÃO)
+// ===========================================
+function activateOfflineMode() {
+    if (isOfflineMode) return;
+    isOfflineMode = true;
+
+    console.warn("🛡️ SIMULAÇÃO ATIVADA");
+
+    const banner = document.getElementById('offline-banner');
+    if(banner) {
+        banner.style.display = 'block';
+        banner.innerText = "⚠️ MODO OFFLINE: Use W, A, S, D para mover";
+    }
+
+    document.getElementById('connection-status').innerText = 'Simulação Local';
+    document.getElementById('status-dot').className = 'dot offline';
+
+    // Carrega o mapa REAL que injetamos via código
+    mapData = REAL_MAP_DATA;
+
+    // Inicia na posição simulada
+    currentX = simX; currentY = simY;
+    drawMap(simX, simY);
+    updateOfflineInfo(simX, simY);
+}
+
+// ===========================================
+// 4. MOVIMENTAÇÃO SUAVE (GAME LOOP)
+// ===========================================
+document.addEventListener('keydown', (e) => {
+    const key = e.key.toLowerCase();
+    if (key === 'w' || e.key === 'ArrowUp') keysPressed.UP = true;
+    if (key === 's' || e.key === 'ArrowDown') keysPressed.DOWN = true;
+    if (key === 'a' || e.key === 'ArrowLeft') keysPressed.LEFT = true;
+    if (key === 'd' || e.key === 'ArrowRight') keysPressed.RIGHT = true;
+
+    // Atalhos
+    if (key === 'enter') handleAction('scan');
+    if (key === 'backspace') handleAction('remove');
+    if (key === 't') handleAction('theme');
+    if (key === 'b') handleAction('bg');
+
+    // Se estiver online, manda pro server
+    if (!isOfflineMode && socket) {
+        if(keysPressed.UP) socket.emit('input_change', { key: 'UP', pressed: true });
+        if(keysPressed.DOWN) socket.emit('input_change', { key: 'DOWN', pressed: true });
+        if(keysPressed.LEFT) socket.emit('input_change', { key: 'LEFT', pressed: true });
+        if(keysPressed.RIGHT) socket.emit('input_change', { key: 'RIGHT', pressed: true });
+    }
 });
 
-// =========================================================
-// 2. RENDERIZADORES (MAPA & OVERLAY)
-// =========================================================
+document.addEventListener('keyup', (e) => {
+    const key = e.key.toLowerCase();
+    if (key === 'w' || e.key === 'ArrowUp') keysPressed.UP = false;
+    if (key === 's' || e.key === 'ArrowDown') keysPressed.DOWN = false;
+    if (key === 'a' || e.key === 'ArrowLeft') keysPressed.LEFT = false;
+    if (key === 'd' || e.key === 'ArrowRight') keysPressed.RIGHT = false;
 
-// A. Mapa do HUD (Quadrado pequeno, Fundo Branco)
-function drawMap(px, py) {
+    if (!isOfflineMode && socket) {
+        if(!keysPressed.UP) socket.emit('input_change', { key: 'UP', pressed: false });
+        if(!keysPressed.DOWN) socket.emit('input_change', { key: 'DOWN', pressed: false });
+        if(!keysPressed.LEFT) socket.emit('input_change', { key: 'LEFT', pressed: false });
+        if(!keysPressed.RIGHT) socket.emit('input_change', { key: 'RIGHT', pressed: false });
+    }
+});
+
+function handleAction(action) {
+    if (isOfflineMode) {
+        if(action === 'scan') {
+            simCart.push({id: Date.now(), nome: "Produto Demo " + (simCart.length+1), preco: (Math.random()*20)+5, icon: "local_mall"});
+            renderCart(simCart, simCart.reduce((a,b)=>a+b.preco, 0));
+        }
+        if(action === 'remove') {
+            simCart.pop();
+            renderCart(simCart, simCart.reduce((a,b)=>a+b.preco, 0));
+        }
+        if(action === 'theme') toggleLocalTheme();
+        if(action === 'bg') toggleLocalBg();
+    } else if (socket) {
+        if(action === 'scan') socket.emit('action_scan');
+        if(action === 'remove') {
+            const lastId = getLastItemId();
+            if(lastId) socket.emit('action_remove', { id: lastId });
+        }
+        if(action === 'theme') socket.emit('action_cycle_theme');
+        if(action === 'bg') socket.emit('action_cycle_bg');
+    }
+}
+
+// LOOP PRINCIPAL (Roda 60x por segundo)
+function gameLoop() {
+    // 1. Lógica Offline (Calcula posição localmente)
+    if (isOfflineMode && mapData) {
+        const speed = 0.15; // Velocidade suave
+        let nextX = simX;
+        let nextY = simY;
+
+        if (keysPressed.UP) nextY -= speed;
+        if (keysPressed.DOWN) nextY += speed;
+        if (keysPressed.LEFT) nextX -= speed;
+        if (keysPressed.RIGHT) nextX += speed;
+
+        // Colisão Básica (Não atravessa paredes TYPE 1)
+        let gridX = Math.round(nextX);
+        let gridY = Math.round(nextY);
+
+        if(gridX >= 0 && gridX < mapData.width && gridY >= 0 && gridY < mapData.height) {
+            let cell = mapData.grid[gridX] ? mapData.grid[gridX][gridY] : null;
+            if (cell && cell.type !== 1) {
+                simX = nextX;
+                simY = nextY;
+            }
+        }
+
+        drawMap(simX, simY);
+        updateOfflineInfo(simX, simY);
+    }
+    // 2. Lógica Online (Apenas interpolação visual)
+    else if (!isOfflineMode && mapData) {
+        currentX += (targetX - currentX) * 0.15;
+        currentY += (targetY - currentY) * 0.15;
+        drawMap(currentX / 30, currentY / 30);
+    }
+
+    requestAnimationFrame(gameLoop);
+}
+requestAnimationFrame(gameLoop);
+
+// ===========================================
+// 5. RENDERIZADORES & MAPA
+// ===========================================
+function drawMap(gridX, gridY) {
     if(!mapCanvas || !mapData) return;
     const w = mapCanvas.parentElement.clientWidth;
     const h = mapCanvas.parentElement.clientHeight;
     mapCanvas.width = w; mapCanvas.height = h;
 
-    // Calcula escala para caber no quadrado
     const TILE = Math.min(w / mapData.width, h / mapData.height);
     const offsetX = (w - (mapData.width * TILE)) / 2;
     const offsetY = (h - (mapData.height * TILE)) / 2;
 
-    // Fundo BRANCO
-    mapCtx.fillStyle = "#ffffff";
-    mapCtx.fillRect(0, 0, w, h);
+    // Fundo
+    mapCtx.fillStyle = "#ffffff"; mapCtx.fillRect(0, 0, w, h);
 
-    // Grid
     for (let x = 0; x < mapData.width; x++) {
         for (let y = 0; y < mapData.height; y++) {
             let dx = offsetX + (x * TILE); let dy = offsetY + (y * TILE);
+            let cell = mapData.grid[x] ? mapData.grid[x][y] : null;
+            if(!cell) continue;
 
-            // Paredes Escuras
-            if (mapData.grid[x][y].type === 1) {
-                mapCtx.fillStyle = "#333";
+            let type = cell.type || 2;
+
+            // Paredes (Cinza Escuro)
+            if (type === 1) {
+                mapCtx.fillStyle = "#2d3436";
                 mapCtx.fillRect(dx, dy, TILE+0.5, TILE+0.5);
             }
-            // Beacons (Azul)
-            if (mapData.grid[x][y].type === 3) {
-                mapCtx.fillStyle = "#0288D1";
+            // Beacons/Prateleiras Especiais (Verde)
+            if (type === 3) {
+                mapCtx.fillStyle = "#00b894";
                 mapCtx.fillRect(dx, dy, TILE, TILE);
+                mapCtx.strokeStyle = "rgba(0, 184, 148, 0.5)";
+                mapCtx.lineWidth = 2;
+                mapCtx.strokeRect(dx, dy, TILE, TILE);
             }
         }
     }
 
-    // Jogador (Ponto Vermelho no Mapa)
-    let finalX = offsetX + (px * (TILE/30));
-    let finalY = offsetY + (py * (TILE/30));
+    // Desenha o Jogador (Bolinha Vermelha)
+    let finalX = offsetX + (gridX * TILE);
+    let finalY = offsetY + (gridY * TILE);
 
+    // Sombra do jogador
+    mapCtx.beginPath(); mapCtx.arc(finalX, finalY + 2, TILE/2, 0, Math.PI*2);
+    mapCtx.fillStyle = "rgba(0,0,0,0.3)"; mapCtx.fill();
+
+    // Jogador
     mapCtx.beginPath(); mapCtx.arc(finalX, finalY, TILE/2, 0, Math.PI*2);
     mapCtx.fillStyle = "#d32f2f"; mapCtx.fill();
     mapCtx.strokeStyle = "white"; mapCtx.lineWidth = 2; mapCtx.stroke();
 }
 
-// B. Overlay (Desenhos por cima de toda a interface)
-function renderOverlay(drawings) {
-    if(!overlayCanvas) return;
-    // O Overlay sempre cobre o container base de 1280x800
-    overlayCanvas.width = 1280;
-    overlayCanvas.height = 800;
-    overlayCtx.clearRect(0, 0, 1280, 800);
+function updateOfflineInfo(x, y) {
+    let setor = "Corredor Central";
+    // Lógica aproximada baseada no mapa V3
+    if (x < 3) setor = "Entrada / Caixas";
+    else if (x > 27) setor = "Padaria & Frios";
+    else if (y < 4) setor = "Hortifruti";
+    else if (y > 15) setor = "Bebidas";
+    else if (x > 12 && x < 18) setor = "Mercearia";
 
-    if (drawings.length > 0) {
-        overlayCtx.lineWidth = 5;
-        overlayCtx.lineCap = "round";
+    document.getElementById('location-name').innerText = setor;
+    document.getElementById('offer-text').innerText = "Modo Offline Ativo";
+}
 
-        drawings.forEach(d => {
-            // As coordenadas vêm em porcentagem (0.0 a 1.0)
-            let dx = d.x * 1280;
-            let dy = d.y * 800;
+// ===========================================
+// 6. LOGIN, RELÓGIO E UTILS
+// ===========================================
 
-            overlayCtx.beginPath();
-            overlayCtx.arc(dx, dy, 5, 0, Math.PI*2);
-            overlayCtx.fillStyle = d.color;
-            overlayCtx.fill();
-        });
+// Login Modificado para Offline
+function performLogin() {
+    if(isOfflineMode) {
+        // LOGIN AUTOMÁTICO OFFLINE
+        closeAuthModal();
+        updateUserInfo(OFFLINE_USER);
+        const status = document.getElementById('connection-status');
+        status.innerText = "Logado (Offline)";
+        status.style.color = "#FFD700";
+        return;
     }
-}
 
-// Game Loop (Animação Suave)
-function gameLoop() {
-    if (mapData) {
-        currentX += (targetX - currentX) * 0.1;
-        currentY += (targetY - currentY) * 0.1;
-        drawMap(currentX, currentY);
-    }
-    requestAnimationFrame(gameLoop);
-}
-requestAnimationFrame(gameLoop);
-
-// =========================================================
-// 3. UTILITÁRIOS & FORMATAÇÃO
-// =========================================================
-function formatCensoredCPF(cpf) {
-    if (!cpf || cpf.length < 11) return "***.***.***-**";
-    const middle = cpf.substring(3, 6) + "." + cpf.substring(6, 9);
-    return `***.${middle}-**`;
-}
-
-function formatCensoredMatricula(mat) {
-    if (!mat || mat.length < 6) return mat;
-    return `${mat.substring(0, 3)}***${mat.substring(mat.length - 3)}`;
-}
-
-function updateClock() {
-    const d = new Date();
-    const el = document.getElementById('clock-display');
-    if(el) el.innerText = d.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
-}
-setInterval(updateClock, 1000);
-
-function loadMapData() {
-    fetch('/api/mapa').then(r => r.json()).then(m => mapData = m);
-}
-
-function resizeApp() {
-    const app = document.getElementById('app-container');
-    // Mantém a proporção e adiciona margem de segurança
-    const scale = Math.min(window.innerWidth/1280, window.innerHeight/800) * 0.95;
-    app.style.transform = `scale(${scale})`;
-
-    // Força o navegador a redesenhar (fix para glitches gráficos)
-    app.style.display = 'none';
-    app.offsetHeight;
-    app.style.display = 'grid';
-}
-window.addEventListener('resize', resizeApp);
-window.addEventListener('load', resizeApp);
-
-// =========================================================
-// 4. LOGIN & CADASTRO (RECUPERADO!)
-// =========================================================
-function toggleRegisterView(showRegister) {
-    document.getElementById('login-form-container').style.display = showRegister ? 'none' : 'block';
-    document.getElementById('register-form-container').style.display = showRegister ? 'block' : 'none';
-    document.getElementById('login-error').style.display = 'none';
-    document.getElementById('reg-error').style.display = 'none';
-}
-
-function toggleEmployeeFields() {
-    const chk = document.getElementById('check-employee');
-    const fields = document.getElementById('employee-fields');
-    if (chk && fields) {
-        fields.style.display = chk.checked ? 'flex' : 'none';
-    }
-}
-
-function doRegister() {
-    const cpf = document.getElementById('reg-cpf').value;
-    const nome = document.getElementById('reg-nome').value;
-    const isEmployee = document.getElementById('check-employee').checked;
-    const matricula = document.getElementById('reg-matricula').value;
-    const cargo = document.getElementById('reg-cargo').value;
-
-    if (!cpf || !nome) return alert("Preencha CPF e Nome.");
-
-    fetch('/api/register', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({ cpf, nome, is_employee: isEmployee, matricula, cargo })
-    }).then(r => r.json()).then(data => {
-        if(data.success) {
-            alert("Cadastro realizado com sucesso!");
-            toggleRegisterView(false);
-        } else {
-            const errEl = document.getElementById('reg-error');
-            errEl.innerText = data.message || "Erro desconhecido";
-            errEl.style.display = 'block';
-        }
-    }).catch(e => alert("Erro de conexão no cadastro."));
-}
-
-function doLogin() {
-    const cpf = document.getElementById('cpf-input').value;
-    fetch('/api/login', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({cpf})
-    })
+    // Login Online
+    const cpf = document.getElementById('login-cpf').value;
+    fetch('/api/login', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({cpf})})
     .then(r => r.json()).then(data => {
-        if(data.success) {
-            document.getElementById('login-overlay').style.display = 'none';
-            document.getElementById('user-display').innerText = data.user.nome.split(' ')[0];
-
-            // Preenche dados do rodapé
-            const elType = document.getElementById('footer-type');
-            const elCpf = document.getElementById('footer-cpf');
-
-            let typeLabel = "Visitante";
-            let cpfLabel = "";
-
-            if (data.user.tipo === 'cliente') {
-                typeLabel = "Cliente";
-                cpfLabel = ` | ${formatCensoredCPF(data.user.cpf_display)}`;
-            } else if (data.user.tipo === 'admin') {
-                typeLabel = "ADMIN";
-            } else {
-                typeLabel = data.user.tipo.split('-')[0]; // Funcionário
-            }
-
-            if(elType) elType.innerText = typeLabel;
-            if(elCpf) elCpf.innerText = cpfLabel;
-
-        } else {
-            document.getElementById('login-error').style.display = 'block';
-        }
-    }).catch(e => console.error("Erro Login:", e));
-}
-
-// Atalho Enter
-const cpfInput = document.getElementById('cpf-input');
-if(cpfInput) {
-    cpfInput.addEventListener("keypress", (e) => {
-        if (e.key === "Enter") doLogin();
+        if(data.success) { closeAuthModal(); updateUserInfo(data.user); }
+        else { document.getElementById('auth-error').style.display='block'; document.getElementById('auth-error').innerText="Erro no Login"; }
     });
 }
 
-// =========================================================
-// 5. CARRINHO
-// =========================================================
-function deleteItem(id) {
-    socket.emit('action_remove', { id: id });
+// Resto das funções auxiliares...
+function toggleAuthMode(mode) {
+    const loginView = document.getElementById('login-view');
+    const registerView = document.getElementById('register-view');
+    const errorMsg = document.getElementById('auth-error');
+    errorMsg.style.display = 'none';
+    if (mode === 'register') { loginView.classList.add('hidden'); registerView.classList.remove('hidden'); }
+    else { registerView.classList.add('hidden'); loginView.classList.remove('hidden'); }
 }
-
+function toggleMatricula() {
+    const isColab = document.getElementById('reg-is-colab').checked;
+    document.getElementById('matricula-group').style.display = isColab ? 'block' : 'none';
+}
+function performRegister() {
+    if(isOfflineMode) return;
+    const nome = document.getElementById('reg-nome').value;
+    const cpf = document.getElementById('reg-cpf').value;
+    const isColab = document.getElementById('reg-is-colab').checked;
+    const matricula = document.getElementById('reg-matricula').value;
+    const payload = { nome, cpf, is_employee: isColab, matricula, cargo: isColab ? "Operador" : "" };
+    fetch('/api/register', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload)})
+    .then(r => r.json()).then(data => {
+        if(data.success) { performLogin(); }
+        else { document.getElementById('auth-error').innerText=data.message; }
+    });
+}
+function closeAuthModal() {
+    const overlay = document.getElementById('login-overlay');
+    overlay.style.opacity = '0';
+    setTimeout(() => overlay.style.display = 'none', 500);
+}
+function updateUserInfo(user) {
+    document.getElementById('user-name-display').innerText = user.nome.split(' ')[0];
+    let docDisplay = maskCPF(user.cpf_display || "");
+    if (user.tipo.includes("Mat:")) {
+        const match = user.tipo.match(/Mat: (\d+)/);
+        if (match) docDisplay = "MAT: " + match[1];
+    }
+    document.getElementById('user-doc-display').innerText = docDisplay;
+    document.getElementById('footer-type').innerText = user.tipo.split(' - ')[0];
+}
+function maskCPF(cpf) {
+    if (!cpf || cpf.length < 11) return "***.***.***-**";
+    const clean = cpf.replace(/\D/g, '');
+    return `***.${clean.substring(3, 6)}.${clean.substring(6, 9)}-**`;
+}
 function renderCart(items, total) {
     const c = document.getElementById('cart-container');
     const t = document.getElementById('total-price');
     if(!c) return;
-
-    // Evita redesenhar se nada mudou
-    if(c.childElementCount === items.length && t.innerText.includes(total.toFixed(2))) return;
-
-    c.innerHTML = "";
-    if (items.length === 0) {
-        c.innerHTML = "<div style='text-align:center; padding:30px; color:#aaa;'>Carrinho Vazio</div>";
+    const currentJSON = JSON.stringify(items);
+    if (currentJSON === lastCartJSON) {
+        if(t && t.innerText !== `R$ ${total.toFixed(2)}`) t.innerText = `R$ ${total.toFixed(2)}`;
+        return;
     }
-
-    items.slice().reverse().forEach(item => {
+    lastCartJSON = currentJSON;
+    c.innerHTML = "";
+    if (items.length === 0) c.innerHTML = "<div style='text-align:center; padding:40px; opacity:0.5'>Lista Vazia</div>";
+    items.slice().reverse().forEach((item, index) => {
         c.innerHTML += `
         <div class="cart-item">
-            <div style="display:flex; align-items:center; gap:8px">
-                <span class="material-icons" style="font-size:16px; color:#004B50">${item.icon||'local_offer'}</span>
-                <span>${item.nome}</span>
+            <div class="item-left">
+                <span class="item-number">${index + 1}</span>
+                <span class="material-icons" style="font-size:16px; opacity:0.7; margin-right:5px">${item.icon||'local_offer'}</span>
+                <span class="item-name">${item.nome}</span>
             </div>
-            <div style="display:flex; align-items:center; gap:10px">
-                <b>R$ ${item.preco.toFixed(2)}</b>
-                <span onclick="deleteItem(${item.id})" style="color:#d32f2f; cursor:pointer; font-weight:bold">✕</span>
-            </div>
+            <div class="item-right"><b>R$ ${item.preco.toFixed(2)}</b>
+            <span onclick="deleteItem(${item.id})" style="color:#d32f2f; cursor:pointer;" class="material-icons">close</span></div>
         </div>`;
     });
-
     if(t) t.innerText = `R$ ${total.toFixed(2)}`;
+    const searchInput = document.getElementById('cart-search');
+    if(searchInput && searchInput.value) filterCart();
+}
+function filterCart() {
+    const input = document.getElementById('cart-search');
+    const filter = input.value.toLowerCase();
+    const items = document.getElementsByClassName('cart-item');
+    for (let i = 0; i < items.length; i++) {
+        const name = items[i].getElementsByClassName('item-name')[0];
+        if (name) items[i].style.display = name.innerText.toLowerCase().indexOf(filter) > -1 ? "" : "none";
+    }
+}
+function deleteItem(id) {
+    if(isOfflineMode) {
+        simCart = simCart.filter(i => i.id !== id);
+        renderCart(simCart, simCart.reduce((a,b)=>a+b.preco, 0));
+    } else {
+        socket.emit('action_remove', { id: id });
+    }
+}
+function getLastItemId() {
+    const items = document.querySelectorAll('.cart-item span[onclick]');
+    if (items.length > 0) return parseInt(items[0].getAttribute('onclick').match(/\d+/)[0]);
+    return null;
+}
+function renderOverlay(drawings) {
+    if(!overlayCanvas) return;
+    overlayCanvas.width = 1280; overlayCanvas.height = 800;
+    overlayCtx.clearRect(0, 0, 1280, 800);
+    if (drawings.length > 0) {
+        overlayCtx.lineWidth = 6; overlayCtx.lineCap = "round";
+        drawings.forEach(d => { overlayCtx.beginPath(); overlayCtx.arc(d.x * 1280, d.y * 800, 3, 0, Math.PI*2); overlayCtx.fillStyle = d.color; overlayCtx.fill(); });
+    }
+}
+function loadMapData() {
+    // No online tenta baixar, se falhar já temos o REAL_MAP_DATA no offline
+    fetch('/api/mapa').then(r => r.json()).then(m => mapData = m).catch(() => console.log("Sem mapa online"));
+}
+function setupSocketEvents() {
+    socket.on('update_state', (data) => {
+        document.getElementById('location-name').innerText = data.setor;
+        document.getElementById('offer-text').innerText = data.oferta;
+        renderCart(data.cart, data.total);
+        renderOverlay(data.drawings || []);
+        applyStyle(data.theme, data.bg_mode);
+        targetX = data.pos_x; targetY = data.pos_y;
+        if (currentX === 0 && currentY === 0) { currentX = targetX; currentY = targetY; }
+        if (!mapData) loadMapData();
+    });
+}
+function updateClock() {
+    const now = new Date();
+    document.getElementById('clock-display').innerText = now.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+    const closeTime = new Date(); closeTime.setHours(22, 0, 0);
+    let diff = closeTime - now;
+    const elCount = document.getElementById('clock-countdown');
+    if (diff > 0 && diff < 43200000) {
+        const h = Math.floor(diff / 3600000);
+        const m = Math.floor((diff % 3600000) / 60000);
+        elCount.innerText = `FECHA EM ${h}H ${m}M`;
+        elCount.style.color = (h === 0 && m < 30) ? 'red' : 'var(--bistek-green)';
+    } else { elCount.innerText = "FECHADO"; elCount.style.color = 'red'; }
+}
+setInterval(updateClock, 1000);
+
+const slides = [{ src: '/static/ads/slide1.jpg', fallback: 'https://img.freepik.com/fotos-gratis/variedade-de-deliciosos-produtos-lacteos_23-2148995052.jpg', title: 'Festival de Laticínios', desc: 'Ofertas exclusivas no Clube Bistek' },{ src: '/static/ads/slide2.jpg', fallback: 'https://img.freepik.com/fotos-gratis/arranjo-de-carne-fresca_23-2148995029.jpg', title: 'Açougue Premium', desc: 'Cortes selecionados e maturados' },{ src: '/static/ads/slide3.jpg', fallback: 'https://img.freepik.com/fotos-gratis/fundo-de-vinho-elegante-com-garrafa_23-2147932637.jpg', title: 'Adega Bistek', desc: 'Os melhores vinhos para o seu jantar' }];
+let currentSlideIndex = 0;
+setInterval(() => {
+    const img = document.getElementById('hero-image');
+    if(!img) return;
+    currentSlideIndex = (currentSlideIndex + 1) % slides.length;
+    const item = slides[currentSlideIndex];
+    img.style.opacity = 0;
+    setTimeout(() => {
+        img.src = item.src;
+        img.onerror = function(){this.src=item.fallback};
+        document.getElementById('hero-title').innerText = item.title;
+        img.style.opacity = 1;
+    }, 500);
+}, 5000);
+
+const themes = ['green', 'red', 'purple'];
+const bgs = ['image', 'clean', 'dark'];
+let lt_idx = 0, lb_idx = 0;
+function toggleLocalTheme() { lt_idx = (lt_idx + 1) % themes.length; applyStyle(themes[lt_idx], bgs[lb_idx]); }
+function toggleLocalBg() { lb_idx = (lb_idx + 1) % bgs.length; applyStyle(themes[lt_idx], bgs[lb_idx]); }
+function applyStyle(theme, bgMode) {
+    const body = document.body;
+    const container = document.getElementById('app-container');
+    body.className = '';
+    if (theme === 'red') body.classList.add('theme-red');
+    if (theme === 'purple') body.classList.add('theme-purple');
+    container.className = '';
+    if (bgMode === 'clean') container.classList.add('bg-clean');
+    if (bgMode === 'dark') container.classList.add('bg-dark');
 }
 
-
-========== ARQUIVO: static/style.css ==========
-/* =========================================
-   RESET E BASE
-   ========================================= */
-* { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', sans-serif; }
-body {
-    background: #000; color: #fff;
-    width: 100vw; height: 100vh; overflow: hidden;
-    display: flex; align-items: center; justify-content: center;
+function resizeAppSmart() {
+    const app = document.getElementById('app-container');
+    if (!app) return;
+    const winW = window.innerWidth; const winH = window.innerHeight;
+    let scale = Math.min((winW*0.95)/1280, (winH*0.95)/800);
+    app.style.transform = `translate(-50%, -50%) scale(${Math.max(scale, 0.1)})`;
 }
-
-/* =========================================
-   GRID PRINCIPAL
-   ========================================= */
-#app-container {
-    width: 1280px; height: 800px;
-    background-color: #f0f0f0; /* Fundo geral mais claro */
-    border-radius: 20px;
-    box-shadow: 0 0 0 2px #333;
-    padding: 15px;
-    position: relative; /* Para o overlay funcionar */
-
-    display: grid;
-    grid-template-columns: 260px 1fr 300px;
-    grid-template-rows: 70px 1fr 40px;
-    gap: 15px;
-}
-
-/* CAMADA DE DESENHO (NOVIDADE) */
-#overlay-canvas {
-    position: absolute; top: 0; left: 0;
-    width: 100%; height: 100%;
-    z-index: 999; /* Fica acima de tudo */
-    pointer-events: none; /* Deixa clicar nos botões embaixo (só ativa pointer no admin) */
-    border-radius: 20px;
-}
-
-/* =========================================
-   HEADER
-   ========================================= */
-header {
-    grid-column: 1 / -1;
-    display: flex; justify-content: space-between; align-items: center;
-    background: #222; padding: 0 25px; border-radius: 12px; border-bottom: 4px solid #004B50;
-    color: white;
-}
-.logo h1 { font-size: 24px; color: #eee; }
-.clube-highlight { color: #FFD700; font-weight: 800; font-style: italic; }
-.user-info { font-weight: 500; color: #ccc; }
-
-/* =========================================
-   COLUNA 1: CARRINHO
-   ========================================= */
-.cart-panel {
-    background: #fff; color: #333; border-radius: 12px;
-    display: flex; flex-direction: column; overflow: hidden; border: 1px solid #ccc;
-}
-.cart-header { background: #e0e0e0; padding: 15px; font-weight: bold; border-bottom: 1px solid #ccc; color: #004B50; }
-.cart-items { flex: 1; padding: 10px; overflow-y: auto; display: flex; flex-direction: column; gap: 5px; }
-.cart-item { display: flex; justify-content: space-between; padding: 8px; background: #fff; border: 1px solid #eee; border-radius: 5px; font-size: 13px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
-.cart-total { background: #333; color: white; padding: 20px; font-size: 20px; font-weight: 800; text-align: center; }
-
-/* =========================================
-   COLUNA 2: ADS (CENTRO)
-   ========================================= */
-.ads-stage {
-    background: #000; border-radius: 12px;
-    border: 2px solid #333; overflow: hidden;
-    position: relative;
-    display: flex; flex-direction: column;
-}
-.ad-banner-img { flex: 1; width: 100%; object-fit: cover; opacity: 0.9; }
-.ad-overlay {
-    position: absolute; bottom: 0; left: 0; width: 100%;
-    background: linear-gradient(to top, rgba(0,0,0,0.95), transparent);
-    padding: 30px; text-align: center;
-}
-.ad-title { font-size: 32px; color: #FFD700; font-weight: 800; text-transform: uppercase; margin-bottom: 5px; text-shadow: 0 2px 10px rgba(0,0,0,0.8); }
-.ad-desc { font-size: 16px; color: #ddd; }
-
-/* =========================================
-   COLUNA 3: HUD / MAPA
-   ========================================= */
-.hud-panel { display: flex; flex-direction: column; gap: 15px; }
-
-.context-card {
-    background: #004B50; color: white; padding: 15px; border-radius: 12px;
-    text-align: center; box-shadow: 0 4px 10px rgba(0,0,0,0.2);
-}
-.context-card h2 { font-size: 22px; font-weight: 900; }
-
-/* MAPA BRANCO (CORRIGIDO) */
-.map-widget {
-    width: 100%; aspect-ratio: 1/1;
-    background: #fff; /* Fundo Branco */
-    border: 3px solid #ccc; border-radius: 12px;
-    overflow: hidden; position: relative;
-}
-canvas.map-cvs { width: 100%; height: 100%; display: block; }
-
-.offer-box {
-    background: #fff; padding: 15px; border-radius: 12px;
-    border-left: 5px solid #FFD700; flex: 1; border: 1px solid #ccc; color: #333;
-    display: flex; flex-direction: column; justify-content: center;
-}
-.offer-box h3 { color: #d32f2f; font-size: 14px; margin-bottom: 5px; text-transform: uppercase; font-weight: bold; }
-.offer-box p { font-size: 20px; font-weight: bold; line-height: 1.2; }
-
-/* =========================================
-   FOOTER & TEMA
-   ========================================= */
-footer {
-    grid-column: 1 / -1;
-    display: flex; justify-content: space-between; align-items: center;
-    background: #333; color: #ccc; font-size: 12px; padding: 0 15px; border-radius: 8px;
-}
-
-body.theme-red header { border-bottom-color: #d32f2f; }
-body.theme-red .context-card { background: #d32f2f; }
-body.theme-red .cart-header { color: #d32f2f; }
-
-/* LOGIN */
-#login-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 9999; display: flex; align-items: center; justify-content: center; }
-.login-box { background: white; color: #333; padding: 40px; border-radius: 16px; width: 450px; text-align: center; }
-.input-group input { width: 100%; padding: 15px; margin: 15px 0; border: 1px solid #ccc; border-radius: 8px; font-size: 16px; }
-.btn-primary { width: 100%; padding: 15px; background: #004B50; color: white; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; }
-.error-msg { color: red; margin-top: 10px; display: none; }
+window.addEventListener('resize', resizeAppSmart);
+window.addEventListener('load', resizeAppSmart);
+initConnection();
 
 
 ========== ARQUIVO: templates/remote.html ==========
@@ -943,122 +1494,29 @@ body.theme-red .cart-header { color: #d32f2f; }
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
 
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/global.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/remote.css') }}">
+
     <style>
-        :root {
-            --bg-color: #121212;
-            --panel-color: #1e1e1e;
-            --accent-color: #00b3b8;
-            --active-color: #00ffea;
-            --danger-color: #d32f2f;
-            --btn-size: 85px;
+        /* Botões de Estilo Cicláveis */
+        .style-controls {
+            display: flex; gap: 10px; margin-bottom: 10px;
         }
-
-        * { box-sizing: border-box; user-select: none; -webkit-user-select: none; -webkit-tap-highlight-color: transparent; }
-
-        body {
-            background-color: var(--bg-color); color: white; margin: 0;
-            height: 100vh; width: 100vw; overflow: hidden;
-            font-family: 'Segoe UI', Roboto, sans-serif;
-            display: flex; flex-direction: column;
-            touch-action: none;
-        }
-
-        /* --- HEADER --- */
-        header {
-            background: var(--panel-color); padding: 10px 15px;
-            border-bottom: 2px solid #333; display: flex; justify-content: space-between; align-items: center;
-            z-index: 20; height: 60px; flex-shrink: 0;
-        }
-        .status-led { width: 12px; height: 12px; background: #444; border-radius: 50%; transition: 0.3s; }
-        .status-led.connected { background: #0f0; box-shadow: 0 0 10px #0f0; }
-
-        /* --- MODO CONTROLE (PADRÃO) --- */
-        #control-mode { flex: 1; display: flex; flex-direction: column; justify-content: space-between; overflow: hidden; }
-
-        .d-pad-container { flex: 1; display: flex; align-items: center; justify-content: center; }
-        .d-pad-grid {
-            display: grid; grid-template-columns: var(--btn-size) var(--btn-size) var(--btn-size);
-            grid-template-rows: var(--btn-size) var(--btn-size) var(--btn-size); gap: 15px;
-        }
-        .d-btn {
-            width: 100%; height: 100%; background: #333; border-radius: 15px;
-            display: flex; align-items: center; justify-content: center;
-            font-size: 40px; color: #aaa; box-shadow: 0 6px 0 #222;
-            transition: transform 0.1s, background 0.1s; cursor: pointer;
-        }
-        .d-btn:active, .d-btn.active { background: var(--accent-color); color: #000; transform: translateY(6px); box-shadow: none; }
-        .center-decor { display: flex; align-items: center; justify-content: center; color: #444; font-size: 12px; font-weight: bold; text-transform: uppercase; }
-
-        /* --- FOOTER DO CONTROLE --- */
-        .control-footer {
-            background: var(--panel-color);
-            padding: 20px;
-            padding-bottom: 70px; /* Margem segura Android */
-            border-top-left-radius: 25px; border-top-right-radius: 25px;
-            display: flex; flex-direction: column; gap: 15px;
-            flex-shrink: 0;
-        }
-        .action-row { display: flex; gap: 10px; }
-        .btn-action {
-            flex: 1; padding: 15px; border: none; border-radius: 12px;
-            font-size: 14px; font-weight: bold; color: white;
-            display: flex; align-items: center; justify-content: center; gap: 8px;
-            box-shadow: 0 4px 0 rgba(0,0,0,0.3); background: #444;
-        }
-        .btn-action:active { transform: translateY(4px); box-shadow: none; }
-        .btn-scan { background: #ff9800; color: #000; }
-        .btn-pen { background: #9C27B0; color: #fff; }
-
-        /* --- MODO DESENHO (OVERLAY) --- */
-        #drawing-mode {
-            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            background: #111; z-index: 50; display: none; flex-direction: column;
-        }
-
-        .draw-viewport {
-            flex: 1; position: relative; overflow: hidden; background: #000;
-            display: flex; align-items: center; justify-content: center;
-        }
-
-        .transform-layer {
-            width: 1280px; height: 800px;
-            position: absolute;
-            transform-origin: center center;
+        .cycle-btn {
+            flex: 1;
             background: #333;
-            box-shadow: 0 0 50px rgba(0,0,0,0.5); /* Sombra para ver os limites */
+            color: white;
+            border: 1px solid #444;
+            padding: 15px;
+            border-radius: 12px;
+            font-weight: bold;
+            display: flex; flex-direction: column; align-items: center; gap: 5px;
+            font-size: 12px;
         }
+        .cycle-btn:active { background: #444; transform: scale(0.98); }
+        .cycle-btn span { font-size: 24px; }
 
-        iframe.mirror-frame {
-            width: 100%; height: 100%; border: none;
-            pointer-events: none; opacity: 0.8;
-        }
-
-        canvas.draw-canvas {
-            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            cursor: crosshair;
-        }
-
-        /* --- TOOLBAR DE DESENHO --- */
-        .draw-toolbar {
-            height: 100px; padding-bottom: 30px;
-            background: #222; display: flex; align-items: center; justify-content: space-around;
-            padding-left: 10px; padding-right: 10px;
-            border-top: 1px solid #444; flex-shrink: 0;
-        }
-        .tool-btn {
-            width: 50px; height: 50px; border-radius: 50%; border: none; background: #333; color: #fff;
-            display: flex; align-items: center; justify-content: center; font-size: 24px;
-        }
-        .tool-btn.active { background: var(--accent-color); color: #000; box-shadow: 0 0 10px var(--accent-color); }
-        .tool-btn.danger { background: #550000; color: #ffaaaa; }
-
-        #color-picker-wrapper {
-            width: 40px; height: 40px; border-radius: 50%; overflow: hidden; border: 2px solid #fff; position: relative;
-        }
-        #color-input {
-            position: absolute; top: -10px; left: -10px; width: 60px; height: 60px; cursor: pointer; border: none;
-        }
-
+        .control-footer { padding-bottom: 30px; }
     </style>
 </head>
 <body>
@@ -1071,17 +1529,11 @@ body.theme-red .cart-header { color: #d32f2f; }
 
         <main class="d-pad-container">
             <div class="d-pad-grid">
-                <div></div>
-                <div class="d-btn" data-key="UP"><span class="material-icons">arrow_upward</span></div>
-                <div></div>
-
+                <div></div><div class="d-btn" data-key="UP"><span class="material-icons">arrow_upward</span></div><div></div>
                 <div class="d-btn" data-key="LEFT"><span class="material-icons">arrow_back</span></div>
                 <div class="center-decor">MOVE</div>
                 <div class="d-btn" data-key="RIGHT"><span class="material-icons">arrow_forward</span></div>
-
-                <div></div>
-                <div class="d-btn" data-key="DOWN"><span class="material-icons">arrow_downward</span></div>
-                <div></div>
+                <div></div><div class="d-btn" data-key="DOWN"><span class="material-icons">arrow_downward</span></div><div></div>
             </div>
         </main>
 
@@ -1089,15 +1541,24 @@ body.theme-red .cart-header { color: #d32f2f; }
             <button class="btn-action btn-scan" onclick="triggerScan()">
                 <span class="material-icons">qr_code_scanner</span> ESCANEAR
             </button>
+
+            <div class="style-controls">
+                <button class="cycle-btn" onclick="cycleBg()">
+                    <span class="material-icons">wallpaper</span>
+                    Mudar Fundo
+                </button>
+                <button class="cycle-btn" onclick="cycleTheme()">
+                    <span class="material-icons">palette</span>
+                    Mudar Tema
+                </button>
+            </div>
+
             <div class="action-row">
                 <button class="btn-action btn-pen" onclick="toggleDrawingMode(true)">
                     <span class="material-icons">edit</span> CANETA
                 </button>
-                <button class="btn-action" onclick="socket.emit('action_reset')">
+                <button class="btn-action btn-reset" onclick="triggerReset()">
                     <span class="material-icons">restart_alt</span> RESET
-                </button>
-                <button class="btn-action" onclick="socket.emit('action_theme')">
-                    <span class="material-icons">palette</span> TEMA
                 </button>
             </div>
         </footer>
@@ -1110,195 +1571,25 @@ body.theme-red .cart-header { color: #d32f2f; }
                 <canvas id="canvas" class="draw-canvas" width="1280" height="800"></canvas>
             </div>
         </div>
-
         <div class="draw-toolbar">
-            <button class="tool-btn" onclick="toggleDrawingMode(false)">
-                <span class="material-icons">arrow_back</span>
-            </button>
-
-            <div id="color-picker-wrapper">
-                <input type="color" id="color-input" value="#ff0000">
-            </div>
-
-            <button class="tool-btn active" id="btn-draw" onclick="setTool('draw')">
-                <span class="material-icons">brush</span>
-            </button>
-            <button class="tool-btn" id="btn-move" onclick="setTool('move')">
-                <span class="material-icons">pan_tool</span>
-            </button>
-
-            <button class="tool-btn danger" onclick="clearDrawings()">
-                <span class="material-icons">delete_forever</span>
-            </button>
+            <button class="tool-btn" onclick="toggleDrawingMode(false)"><span class="material-icons">arrow_back</span></button>
+            <div id="color-picker-wrapper"><input type="color" id="color-input" value="#ff0000"></div>
+            <button class="tool-btn active" id="btn-draw" onclick="setTool('draw')"><span class="material-icons">brush</span></button>
+            <button class="tool-btn" id="btn-move" onclick="setTool('move')"><span class="material-icons">pan_tool</span></button>
+            <button class="tool-btn danger" onclick="clearDrawings()"><span class="material-icons">delete_forever</span></button>
         </div>
     </div>
 
+    <script src="{{ url_for('static', filename='js/remote.js') }}"></script>
     <script>
-        const socket = io();
-        const led = document.getElementById('statusLed');
-
-        socket.on('connect', () => { led.classList.add('connected'); if(navigator.vibrate) navigator.vibrate(50); });
-        socket.on('disconnect', () => led.classList.remove('connected'));
-
-        // --- HACK PARA LOGIN ---
-        const iframe = document.getElementById('mirrorIframe');
-        iframe.onload = function() {
-            try {
-                const doc = iframe.contentDocument || iframe.contentWindow.document;
-                const overlay = doc.getElementById('login-overlay');
-                if(overlay) overlay.style.display = 'none';
-                doc.body.style.cursor = 'none';
-            } catch (e) {}
-        };
-
-        // --- LÓGICA DO D-PAD ---
-        document.querySelectorAll('.d-btn').forEach(btn => {
-            const key = btn.getAttribute('data-key');
-            if(!key) return;
-            const press = (e) => { if(e.type === 'touchstart') e.preventDefault(); btn.classList.add('active'); if(navigator.vibrate) navigator.vibrate(15); socket.emit('input_change', { key: key, pressed: true }); };
-            const release = (e) => { if(e.type === 'touchend') e.preventDefault(); btn.classList.remove('active'); socket.emit('input_change', { key: key, pressed: false }); };
-            btn.addEventListener('touchstart', press, { passive: false });
-            btn.addEventListener('touchend', release, { passive: false });
-            btn.addEventListener('mousedown', press);
-            btn.addEventListener('mouseup', release);
-            btn.addEventListener('mouseleave', release);
-        });
-
-        function triggerScan() { socket.emit('action_scan'); if(navigator.vibrate) navigator.vibrate([30, 50]); }
-
-        // --- LÓGICA DE DESENHO (CORRIGIDA E INTERPOLADA) ---
-
-        const drawingModeEl = document.getElementById('drawing-mode');
-        const layer = document.getElementById('layer');
-        const canvas = document.getElementById('canvas');
-        const ctx = canvas.getContext('2d');
-        const viewport = document.getElementById('viewport');
-
-        let currentTool = 'draw';
-        let scale = 1, pX = 0, pY = 0;
-        let isDragging = false, startDist = 0;
-        let lastX = 0, lastY = 0;
-
-        function fitToScreen() {
-            const vw = viewport.clientWidth;
-            const vh = viewport.clientHeight;
-            scale = Math.min(vw / 1280, vh / 800) * 0.95;
-            updateTransform();
+        function cycleBg() {
+            socket.emit('action_cycle_bg');
+            if(navigator.vibrate) navigator.vibrate(30);
         }
-
-        function toggleDrawingMode(show) {
-            drawingModeEl.style.display = show ? 'flex' : 'none';
-            if(show) {
-                fitToScreen();
-                if(iframe.contentWindow) iframe.contentWindow.location.reload();
-                pX = 0; pY = 0; updateTransform();
-            }
+        function cycleTheme() {
+            socket.emit('action_cycle_theme');
+            if(navigator.vibrate) navigator.vibrate(30);
         }
-
-        function setTool(tool) {
-            currentTool = tool;
-            document.getElementById('btn-draw').className = `tool-btn ${tool==='draw'?'active':''}`;
-            document.getElementById('btn-move').className = `tool-btn ${tool==='move'?'active':''}`;
-        }
-
-        function clearDrawings() {
-            socket.emit('draw_clear');
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            if(navigator.vibrate) navigator.vibrate(50);
-        }
-
-        function updateTransform() { layer.style.transform = `translate(${pX}px, ${pY}px) scale(${scale})`; }
-        function getDist(t1, t2) { return Math.hypot(t1.clientX - t2.clientX, t1.clientY - t2.clientY); }
-
-        // --- CÁLCULO DE COORDENADAS PRECISO ---
-        // Converte o toque na tela para o espaço interno 1280x800, independente do zoom/pan
-        function getCanvasPoint(touch) {
-            const rect = canvas.getBoundingClientRect(); // Pega tamanho visual atual (com zoom)
-
-            // Regra de três: (PosiçãoToque - InicioCanvas) * (TamanhoOriginal / TamanhoVisual)
-            const x = (touch.clientX - rect.left) * (canvas.width / rect.width);
-            const y = (touch.clientY - rect.top) * (canvas.height / rect.height);
-
-            return { x, y };
-        }
-
-        viewport.addEventListener('touchstart', (e) => {
-            e.preventDefault();
-            if (e.touches.length === 2) { startDist = getDist(e.touches[0], e.touches[1]); isDragging = false; return; }
-
-            if (currentTool === 'move') {
-                isDragging = true; lastX = e.touches[0].clientX; lastY = e.touches[0].clientY;
-            } else if (currentTool === 'draw') {
-                const p = getCanvasPoint(e.touches[0]);
-                lastX = p.x; lastY = p.y;
-                drawAndEmit(p.x, p.y, p.x, p.y); // Ponto inicial
-            }
-        }, { passive: false });
-
-        viewport.addEventListener('touchmove', (e) => {
-            e.preventDefault();
-            if (e.touches.length === 2) {
-                const newDist = getDist(e.touches[0], e.touches[1]);
-                scale = Math.min(Math.max(scale * (newDist / startDist), 0.2), 3.0);
-                startDist = newDist; updateTransform(); return;
-            }
-
-            if (currentTool === 'move' && isDragging) {
-                pX += e.touches[0].clientX - lastX; pY += e.touches[0].clientY - lastY;
-                lastX = e.touches[0].clientX; lastY = e.touches[0].clientY;
-                updateTransform();
-            } else if (currentTool === 'draw') {
-                const p = getCanvasPoint(e.touches[0]);
-
-                // Desenha linha contínua localmente
-                drawLocal(lastX, lastY, p.x, p.y);
-
-                // Emite com Interpolação (Resolve os "pontinhos" no tablet)
-                emitInterpolated(lastX, lastY, p.x, p.y);
-
-                lastX = p.x; lastY = p.y;
-            }
-        }, { passive: false });
-
-        viewport.addEventListener('touchend', () => { isDragging = false; });
-
-        // Desenha no celular (visual imediato)
-        function drawLocal(x1, y1, x2, y2) {
-            ctx.beginPath();
-            ctx.strokeStyle = document.getElementById('color-input').value;
-            ctx.lineWidth = 5; ctx.lineCap = "round";
-            ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
-        }
-
-        // Envia para o servidor com preenchimento de lacunas (Interpolação)
-        function emitInterpolated(x1, y1, x2, y2) {
-            const dist = Math.hypot(x2 - x1, y2 - y1);
-            const color = document.getElementById('color-input').value;
-
-            // Se a distância for grande, cria pontos intermediários
-            // Isso engana o Tablet para ele desenhar uma linha mais sólida
-            const steps = Math.ceil(dist / 5); // Um ponto a cada 5 pixels
-
-            for (let i = 1; i <= steps; i++) {
-                const t = i / steps;
-                const cx = x1 + (x2 - x1) * t;
-                const cy = y1 + (y2 - y1) * t;
-
-                socket.emit('draw_add', {
-                    x: cx / 1280, // Normaliza para 0.0 - 1.0
-                    y: cy / 800,
-                    color: color
-                });
-            }
-        }
-
-        // Função legado para ponto único
-        function drawAndEmit(x1, y1, x2, y2) {
-            drawLocal(x1, y1, x2, y2);
-            emitInterpolated(x1, y1, x2, y2);
-        }
-
-        document.addEventListener('gesturestart', e => e.preventDefault());
     </script>
 </body>
 </html>
@@ -1309,204 +1600,171 @@ body.theme-red .cart-header { color: #d32f2f; }
 <html lang="pt-br">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Clube Bistek Ads</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Clube Bistek OS</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/tablet.css') }}">
     <style>
-        /* CORREÇÃO VISUAL: Fundo cinza para parecer tela cheia sem bordas pretas */
-        body {
-            background-color: #f0f0f0; /* Mesma cor do container */
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            height: 100vh;
-            width: 100vw;
-            margin: 0;
-            overflow: hidden;
-        }
-
-        #app-container {
-            width: 1280px;
-            height: 800px;
-            /* Sombra suave para o PC, invisível no celular se preencher tudo */
-            box-shadow: 0 0 50px rgba(0,0,0,0.2);
-            /* Importante para o novo cálculo de posicionamento */
-            position: absolute;
-        }
-
-        /* BLOQUEIO DE ORIENTAÇÃO (Aparece se estiver em pé) */
-        #orientation-lock {
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: #1e1e1e; z-index: 99999;
+        /* Aviso de Modo Offline/Sobrevivência */
+        #offline-banner {
             display: none;
-            flex-direction: column; align-items: center; justify-content: center;
-            color: white; text-align: center;
-        }
-
-        @media screen and (max-width: 900px) and (orientation: portrait) {
-            #orientation-lock { display: flex; }
-            #app-container { opacity: 0; pointer-events: none; }
+            position: fixed; top: 0; left: 50%; transform: translateX(-50%);
+            background: #D32F2F; color: white;
+            padding: 5px 20px; border-radius: 0 0 10px 10px;
+            font-weight: bold; font-size: 12px; z-index: 99999;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
         }
     </style>
 </head>
 <body>
-
-    <div id="orientation-lock">
-        <span class="material-icons" style="font-size: 64px; color: #00b3b8; margin-bottom: 20px; animation: rotate-icon 2s infinite">screen_rotation</span>
-        <h2>Gire seu celular</h2>
-        <p style="color:#aaa">Otimizado para modo Paisagem</p>
-    </div>
-
+    <div id="offline-banner">⚠️ MODO OFFLINE (SIMULAÇÃO)</div>
     <div id="app-container">
 
         <canvas id="overlay-canvas"></canvas>
 
-        <header>
-            <div class="logo"><h1><span class="clube-highlight">Clube</span> Bistek</h1></div>
-            <div class="user-info" id="user-display">Visitante</div>
+        <header class="glass-panel">
+            <div class="brand-area">
+                <h1>
+                    <span class="clube-badge">CLUBE</span>
+                    <span style="font-weight:900; color:var(--bistek-green)">Bistek</span>
+                </h1>
+            </div>
+
+            <div class="store-info">
+                <span class="store-id">LOJA 26</span>
+                <span class="store-addr">Av. do Forte, 1396, Porto Alegre</span>
+            </div>
+
+            <div class="user-pill">
+                <div class="avatar-circle">
+                    <span class="material-icons">person</span>
+                </div>
+                <div class="user-data-col">
+                    <span id="user-name-display" class="u-name">Visitante</span>
+                    <span id="user-doc-display" class="u-doc">--</span>
+                </div>
+            </div>
         </header>
 
-        <aside class="cart-panel">
-            <div class="cart-header"><span class="material-icons">shopping_cart</span> &nbsp; Carrinho</div>
-            <div class="cart-items" id="cart-container">
-                <div style="text-align:center; padding:20px; color:#999">Vazio</div>
+        <aside class="glass-panel cart-panel">
+            <div class="cart-header">
+                <div class="cart-title-group">
+                    <span class="material-icons">shopping_cart</span>
+                    <span>Lista</span>
+                </div>
+                <div class="search-wrapper">
+                    <input type="text" id="cart-search" placeholder="Buscar..." onkeyup="filterCart()">
+                    <span class="material-icons search-icon">search</span>
+                </div>
             </div>
-            <div class="cart-total" id="total-price">R$ 0,00</div>
+
+            <div class="cart-items" id="cart-container">
+                </div>
+
+            <div class="cart-total-area">
+                <small>TOTAL ESTIMADO</small>
+                <div class="total-value" id="total-price">R$ 0,00</div>
+            </div>
         </aside>
 
-        <main class="ads-stage">
-            <img src="https://img.freepik.com/fotos-gratis/variedade-de-deliciosos-produtos-lacteos_23-2148995052.jpg" class="ad-banner-img" id="ad-image">
-            <div class="ad-overlay">
-                <h1 class="ad-title" id="ad-title">Festival de Ofertas</h1>
-                <p class="ad-desc" id="ad-desc">Aproveite os descontos exclusivos de hoje.</p>
+        <main class="glass-panel showcase-stage">
+            <img id="hero-image" class="hero-content" src="https://img.freepik.com/fotos-gratis/variedade-de-deliciosos-produtos-lacteos_23-2148995052.jpg">
+            <div class="hero-overlay">
+                <h2 id="hero-title" style="color:#FFD700; margin:0 0 5px 0">Festival de Ofertas</h2>
+                <p id="hero-desc" style="margin:0">Aproveite descontos exclusivos.</p>
             </div>
         </main>
 
         <aside class="hud-panel">
-            <div class="context-card">
-                <small>LOCALIZAÇÃO</small>
-                <h2 id="location-name">--</h2>
+            <div class="hud-child location-card">
+                <small style="opacity:0.8; letter-spacing: 1px;">VOCÊ ESTÁ EM</small>
+                <h2 id="location-name" style="font-size:22px; margin:5px 0">Entrada</h2>
             </div>
-            <div class="map-widget">
-                <canvas id="map-canvas" class="map-cvs"></canvas>
+            <div class="hud-child map-widget">
+                <canvas id="map-canvas"></canvas>
             </div>
-            <div class="offer-box">
-                <h3><span class="material-icons" style="font-size:12px">star</span> Destaque</h3>
-                <p id="offer-text">Buscando ofertas...</p>
+            <div class="hud-child offer-box">
+                <strong style="color:#d32f2f; font-size:12px; display:flex; align-items:center; gap:5px;">
+                    <span class="material-icons" style="font-size:14px">local_offer</span> DESTAQUE
+                </strong>
+                <p id="offer-text" style="font-weight:bold; font-size:16px; margin-top:5px; line-height:1.2">Buscando...</p>
             </div>
         </aside>
 
-        <footer>
-            <div style="display:flex; align-items:center; gap:5px">
-                <span class="material-icons" style="font-size:14px; color:#0f0">wifi</span>
-                <span>Online</span>
+        <footer class="glass-panel">
+            <div class="status-pill">
+                <div id="status-dot" class="dot offline"></div>
+                <span id="connection-status">Offline</span>
             </div>
-            <div>
-                <span id="footer-type"></span>
-                <span id="footer-cpf"></span>
+            <div style="font-size:14px; color:#555; font-weight:600">
+                <span id="footer-type">Visitante</span>
             </div>
-            <span id="clock-display">00:00</span>
+            <div class="clock-area">
+                <div class="clock-time">
+                    <span class="material-icons" style="font-size:18px">schedule</span>
+                    <span id="clock-display">00:00</span>
+                </div>
+                <span id="clock-countdown" class="clock-countdown">CALCULANDO...</span>
+            </div>
         </footer>
 
         <div id="login-overlay">
-            <div class="login-box" id="login-form-container">
-                <h2>Iniciar Compras</h2>
-                <div class="input-group">
-                    <input type="text" id="cpf-input" placeholder="CPF do Cliente">
+            <div class="auth-container">
+
+                <div id="login-view" class="auth-view">
+                    <div class="auth-header">
+                        <h2>Bem-vindo</h2>
+                        <p>Digite seu CPF para acessar o Clube</p>
+                    </div>
+                    <div class="input-group">
+                        <label>CPF</label>
+                        <input type="text" id="login-cpf" placeholder="000.000.000-00">
+                    </div>
+                    <button class="btn-primary" onclick="performLogin()">
+                        <span>ENTRAR</span> <span class="material-icons">login</span>
+                    </button>
+                    <button class="btn-link" onclick="toggleAuthMode('register')">Não tem conta? Cadastre-se</button>
                 </div>
-                <button class="btn-primary" onclick="doLogin()">ACESSAR</button>
-                <p id="login-error" class="error-msg">CPF não encontrado</p>
+
+                <div id="register-view" class="auth-view hidden">
+                    <div class="auth-header">
+                        <h2>Criar Conta</h2>
+                        <p>Preencha seus dados para começar</p>
+                    </div>
+
+                    <div class="input-group">
+                        <label>Nome Completo</label>
+                        <input type="text" id="reg-nome" placeholder="Seu Nome">
+                    </div>
+                    <div class="input-group">
+                        <label>CPF</label>
+                        <input type="text" id="reg-cpf" placeholder="000.000.000-00">
+                    </div>
+
+                    <label class="checkbox-wrapper">
+                        <input type="checkbox" id="reg-is-colab" onchange="toggleMatricula()">
+                        <span>Sou Colaborador Bistek</span>
+                    </label>
+
+                    <div class="input-group" id="matricula-group" style="display:none; animation:fadeIn 0.3s">
+                        <label>Matrícula</label>
+                        <input type="text" id="reg-matricula" placeholder="000000">
+                    </div>
+
+                    <button class="btn-primary" onclick="performRegister()">
+                        <span>CADASTRAR</span> <span class="material-icons">check_circle</span>
+                    </button>
+                    <button class="btn-link" onclick="toggleAuthMode('login')">Voltar para Login</button>
+                </div>
+
+                <p id="auth-error" class="error-msg"></p>
             </div>
         </div>
 
     </div>
 
-    <script src="{{ url_for('static', filename='script.js') }}"></script>
-
-<script>
-        // Lógica de Adaptação Híbrida (PC vs Mobile/Tablet)
-        function resizeAppSmart() {
-            const app = document.getElementById('app-container');
-            const winW = window.innerWidth;
-            const winH = window.innerHeight;
-
-            // Dimensões originais do design (Base 1280x800)
-            const baseW = 1280;
-            const baseH = 800;
-
-            // --- DETECÇÃO INTELIGENTE ---
-            // 1. É pequeno? (Menor que um monitor de 14 polegadas padrão)
-            const isSmallScreen = winW <= 1366;
-            // 2. Tem Touch? (Tablets e Celulares geralmente têm touch)
-            const isTouchDevice = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
-
-            // Se for Tela Pequena OU Dispositivo de Toque -> MODO TELA CHEIA (Stretch)
-            // Isso garante que o Tablet entre aqui e não no modo PC
-            if (isSmallScreen || isTouchDevice) {
-
-                // Calcula a escala exata para bater nas bordas
-                const scaleX = winW / baseW;
-                const scaleY = winH / baseH;
-
-                // Força o preenchimento total (pode esticar um pouco)
-                app.style.transformOrigin = 'top left';
-                app.style.transform = `scale(${scaleX}, ${scaleY})`;
-
-                // Cola nos cantos
-                app.style.left = '0px';
-                app.style.top = '0px';
-                app.style.position = 'absolute';
-
-                // Remove estilos de "janela" para parecer app nativo
-                app.style.borderRadius = '0px';
-                app.style.boxShadow = 'none';
-
-            } else {
-                // MODO PC / PROJETOR / TV (Manter proporção com margem elegante)
-                const scaleX = winW / baseW;
-                const scaleY = winH / baseH;
-
-                // Mantém a proporção correta (sem esticar) e adiciona margem
-                let scale = Math.min(scaleX, scaleY) * 0.95;
-
-                app.style.transformOrigin = 'center center';
-                app.style.transform = `scale(${scale})`;
-
-                app.style.left = 'auto';
-                app.style.top = 'auto';
-                app.style.position = 'relative'; // Volta ao fluxo normal para centralizar
-
-                app.style.borderRadius = '20px';
-                app.style.boxShadow = '0 0 50px rgba(0,0,0,0.5)';
-            }
-
-            // Corrige glitches de renderização
-            app.style.display = 'none';
-            app.offsetHeight;
-            app.style.display = 'grid';
-        }
-
-        window.addEventListener('resize', resizeAppSmart);
-        window.addEventListener('load', resizeAppSmart);
-        window.addEventListener('orientationchange', () => {
-            setTimeout(resizeAppSmart, 200);
-        });
-
-        // Ícone de girar (mantido)
-        const styleSheet = document.createElement("style");
-        styleSheet.innerText = `
-            @keyframes rotate-icon {
-                0% { transform: rotate(0deg); }
-                25% { transform: rotate(-90deg); }
-                75% { transform: rotate(-90deg); }
-                100% { transform: rotate(0deg); }
-            }
-        `;
-        document.head.appendChild(styleSheet);
-    </script>
+    <script src="{{ url_for('static', filename='js/tablet.js') }}"></script>
 </body>
 </html>
 

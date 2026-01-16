@@ -2,62 +2,168 @@
 <html lang="pt-br">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Clube Bistek Ads</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Clube Bistek OS</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
-
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/global.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/tablet.css') }}">
+    <style>
+        /* Aviso de Modo Offline/Sobrevivência */
+        #offline-banner {
+            display: none;
+            position: fixed; top: 0; left: 50%; transform: translateX(-50%);
+            background: #D32F2F; color: white;
+            padding: 5px 20px; border-radius: 0 0 10px 10px;
+            font-weight: bold; font-size: 12px; z-index: 99999;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+        }
+    </style>
 </head>
 <body>
-    <div id="orientation-lock">
-        <span class="material-icons" style="font-size: 64px; color: #00b3b8; margin-bottom: 20px; animation: rotate-icon 2s infinite">screen_rotation</span>
-        <h2>Gire seu celular</h2>
-    </div>
-
+    <div id="offline-banner">⚠️ MODO OFFLINE (SIMULAÇÃO)</div>
     <div id="app-container">
+
         <canvas id="overlay-canvas"></canvas>
 
-        <header>
-            <div class="logo"><h1><span class="clube-highlight">Clube</span> Bistek</h1></div>
-            <div class="user-info" id="user-display">Visitante</div>
+        <header class="glass-panel">
+            <div class="brand-area">
+                <h1>
+                    <span class="clube-badge">CLUBE</span>
+                    <span style="font-weight:900; color:var(--bistek-green)">Bistek</span>
+                </h1>
+            </div>
+
+            <div class="store-info">
+                <span class="store-id">LOJA 26</span>
+                <span class="store-addr">Av. do Forte, 1396, Porto Alegre</span>
+            </div>
+
+            <div class="user-pill">
+                <div class="avatar-circle">
+                    <span class="material-icons">person</span>
+                </div>
+                <div class="user-data-col">
+                    <span id="user-name-display" class="u-name">Visitante</span>
+                    <span id="user-doc-display" class="u-doc">--</span>
+                </div>
+            </div>
         </header>
 
-        <aside class="cart-panel">
-            <div class="cart-header"><span class="material-icons">shopping_cart</span> &nbsp; Carrinho</div>
-            <div class="cart-items" id="cart-container"><div style="text-align:center; padding:20px; color:#999">Vazio</div></div>
-            <div class="cart-total" id="total-price">R$ 0,00</div>
+        <aside class="glass-panel cart-panel">
+            <div class="cart-header">
+                <div class="cart-title-group">
+                    <span class="material-icons">shopping_cart</span>
+                    <span>Lista</span>
+                </div>
+                <div class="search-wrapper">
+                    <input type="text" id="cart-search" placeholder="Buscar..." onkeyup="filterCart()">
+                    <span class="material-icons search-icon">search</span>
+                </div>
+            </div>
+
+            <div class="cart-items" id="cart-container">
+                </div>
+
+            <div class="cart-total-area">
+                <small>TOTAL ESTIMADO</small>
+                <div class="total-value" id="total-price">R$ 0,00</div>
+            </div>
         </aside>
 
-        <main class="ads-stage">
-            <img src="https://img.freepik.com/fotos-gratis/variedade-de-deliciosos-produtos-lacteos_23-2148995052.jpg" class="ad-banner-img">
-            <div class="ad-overlay">
-                <h1 class="ad-title animate-entry">Festival de Ofertas</h1>
-                <p class="ad-desc animate-entry">Aproveite os descontos exclusivos de hoje.</p>
+        <main class="glass-panel showcase-stage">
+            <img id="hero-image" class="hero-content" src="https://img.freepik.com/fotos-gratis/variedade-de-deliciosos-produtos-lacteos_23-2148995052.jpg">
+            <div class="hero-overlay">
+                <h2 id="hero-title" style="color:#FFD700; margin:0 0 5px 0">Festival de Ofertas</h2>
+                <p id="hero-desc" style="margin:0">Aproveite descontos exclusivos.</p>
             </div>
         </main>
 
         <aside class="hud-panel">
-            <div class="context-card"><small>LOCALIZAÇÃO</small><h2 id="location-name">--</h2></div>
-            <div class="map-widget"><canvas id="map-canvas" class="map-cvs"></canvas></div>
-            <div class="offer-box"><h3><span class="material-icons" style="font-size:12px">star</span> Destaque</h3><p id="offer-text">Buscando...</p></div>
+            <div class="hud-child location-card">
+                <small style="opacity:0.8; letter-spacing: 1px;">VOCÊ ESTÁ EM</small>
+                <h2 id="location-name" style="font-size:22px; margin:5px 0">Entrada</h2>
+            </div>
+            <div class="hud-child map-widget">
+                <canvas id="map-canvas"></canvas>
+            </div>
+            <div class="hud-child offer-box">
+                <strong style="color:#d32f2f; font-size:12px; display:flex; align-items:center; gap:5px;">
+                    <span class="material-icons" style="font-size:14px">local_offer</span> DESTAQUE
+                </strong>
+                <p id="offer-text" style="font-weight:bold; font-size:16px; margin-top:5px; line-height:1.2">Buscando...</p>
+            </div>
         </aside>
 
-        <footer>
-            <div style="display:flex; align-items:center; gap:5px"><span class="material-icons" style="font-size:14px; color:#0f0">wifi</span><span>Online</span></div>
-            <div><span id="footer-type"></span><span id="footer-cpf"></span></div>
-            <span id="clock-display">00:00</span>
+        <footer class="glass-panel">
+            <div class="status-pill">
+                <div id="status-dot" class="dot offline"></div>
+                <span id="connection-status">Offline</span>
+            </div>
+            <div style="font-size:14px; color:#555; font-weight:600">
+                <span id="footer-type">Visitante</span>
+            </div>
+            <div class="clock-area">
+                <div class="clock-time">
+                    <span class="material-icons" style="font-size:18px">schedule</span>
+                    <span id="clock-display">00:00</span>
+                </div>
+                <span id="clock-countdown" class="clock-countdown">CALCULANDO...</span>
+            </div>
         </footer>
 
         <div id="login-overlay">
-            <div class="login-box">
-                <h2 style="color:#333; margin-bottom:20px;">Iniciar Compras</h2>
-                <input type="text" id="cpf-input" placeholder="Digite seu CPF">
-                <button class="btn-primary" onclick="doLogin()">ACESSAR</button>
-                <p id="login-error" class="error-msg">CPF não encontrado</p>
+            <div class="auth-container">
+
+                <div id="login-view" class="auth-view">
+                    <div class="auth-header">
+                        <h2>Bem-vindo</h2>
+                        <p>Digite seu CPF para acessar o Clube</p>
+                    </div>
+                    <div class="input-group">
+                        <label>CPF</label>
+                        <input type="text" id="login-cpf" placeholder="000.000.000-00">
+                    </div>
+                    <button class="btn-primary" onclick="performLogin()">
+                        <span>ENTRAR</span> <span class="material-icons">login</span>
+                    </button>
+                    <button class="btn-link" onclick="toggleAuthMode('register')">Não tem conta? Cadastre-se</button>
+                </div>
+
+                <div id="register-view" class="auth-view hidden">
+                    <div class="auth-header">
+                        <h2>Criar Conta</h2>
+                        <p>Preencha seus dados para começar</p>
+                    </div>
+
+                    <div class="input-group">
+                        <label>Nome Completo</label>
+                        <input type="text" id="reg-nome" placeholder="Seu Nome">
+                    </div>
+                    <div class="input-group">
+                        <label>CPF</label>
+                        <input type="text" id="reg-cpf" placeholder="000.000.000-00">
+                    </div>
+
+                    <label class="checkbox-wrapper">
+                        <input type="checkbox" id="reg-is-colab" onchange="toggleMatricula()">
+                        <span>Sou Colaborador Bistek</span>
+                    </label>
+
+                    <div class="input-group" id="matricula-group" style="display:none; animation:fadeIn 0.3s">
+                        <label>Matrícula</label>
+                        <input type="text" id="reg-matricula" placeholder="000000">
+                    </div>
+
+                    <button class="btn-primary" onclick="performRegister()">
+                        <span>CADASTRAR</span> <span class="material-icons">check_circle</span>
+                    </button>
+                    <button class="btn-link" onclick="toggleAuthMode('login')">Voltar para Login</button>
+                </div>
+
+                <p id="auth-error" class="error-msg"></p>
             </div>
         </div>
+
     </div>
 
     <script src="{{ url_for('static', filename='js/tablet.js') }}"></script>

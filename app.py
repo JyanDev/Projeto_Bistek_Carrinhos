@@ -45,7 +45,9 @@ cart_state = {
     "total": 0.00,
     "theme": "green",
     "moving": {"UP": False, "DOWN": False, "LEFT": False, "RIGHT": False},
-    "drawings": []
+    "drawings": [],
+    "theme": "green",      # Opções: green, red, purple
+    "bg_mode": "image"
 }
 
 thread = None
@@ -70,7 +72,9 @@ def background_physics():
             "cart": cart_state["cart_items"],
             "total": cart_state["total"],
             "user": cart_state["user"],
-            "drawings": cart_state["drawings"]
+            "drawings": cart_state["drawings"],
+            "theme": cart_state["theme"],
+            "bg_mode": cart_state.get("bg_mode", "image")
         }
 
         # 3. Envia Broadcast
@@ -194,7 +198,28 @@ def start_tunnel():
         subprocess.Popen(["cloudflared", "tunnel", "--url", "http://localhost:5000"])
     except:
         print("⚠️ Cloudflared não encontrado.")
+# NOVO: Alavanca de Fundo (Imagem vs Branco)
+@socketio.on('action_cycle_theme')
+def cycle_theme():
+    # Ciclo: Green -> Red -> Purple -> Green
+    modes = ['green', 'red', 'purple']
+    current = cart_state['theme']
+    try:
+        next_idx = (modes.index(current) + 1) % len(modes)
+    except:
+        next_idx = 0
+    cart_state['theme'] = modes[next_idx]
 
+@socketio.on('action_cycle_bg')
+def cycle_bg():
+    # Ciclo: Image -> Clean -> Dark -> Image
+    modes = ['image', 'clean', 'dark']
+    current = cart_state['bg_mode']
+    try:
+        next_idx = (modes.index(current) + 1) % len(modes)
+    except:
+        next_idx = 0
+    cart_state['bg_mode'] = modes[next_idx]
 @socketio.on('draw_add')
 def handle_draw_add(data):
     """Recebe: {'x': 10, 'y': 20, 'color': '#ff0000'}"""
