@@ -442,17 +442,41 @@ setInterval(updateClock, 1000);
 const slides = [{ src: '/static/ads/slide1.jpg', fallback: 'https://img.freepik.com/fotos-gratis/variedade-de-deliciosos-produtos-lacteos_23-2148995052.jpg', title: 'Festival de Laticínios', desc: 'Ofertas exclusivas no Clube Bistek' },{ src: '/static/ads/slide2.jpg', fallback: 'https://img.freepik.com/fotos-gratis/arranjo-de-carne-fresca_23-2148995029.jpg', title: 'Açougue Premium', desc: 'Cortes selecionados e maturados' },{ src: '/static/ads/slide3.jpg', fallback: 'https://img.freepik.com/fotos-gratis/fundo-de-vinho-elegante-com-garrafa_23-2147932637.jpg', title: 'Adega Bistek', desc: 'Os melhores vinhos para o seu jantar' }];
 let currentSlideIndex = 0;
 setInterval(() => {
-    const img = document.getElementById('hero-image');
+    const img = document.getElementById('hero-image'); // Verifique se o ID no HTML é 'hero-image' ou 'ad-image'
+    const titleEl = document.getElementById('hero-title');
+    const descEl = document.getElementById('hero-desc'); // Se tiver descrição no HTML
+
     if(!img) return;
-    currentSlideIndex = (currentSlideIndex + 1) % slides.length;
-    const item = slides[currentSlideIndex];
+
+    // 1. Inicia o Fade Out (Some a imagem atual)
     img.style.opacity = 0;
+
+    // 2. Espera 500ms (tempo da transição CSS) para trocar o conteúdo
     setTimeout(() => {
+        currentSlideIndex = (currentSlideIndex + 1) % slides.length;
+        const item = slides[currentSlideIndex];
+
+        // Define o que acontece quando a NOVA imagem terminar de baixar
+        img.onload = function() {
+            img.style.opacity = 1; // Só aparece agora que carregou!
+        };
+
+        // Tratamento de erro (Fallback)
+        img.onerror = function() {
+            this.src = item.fallback;
+            // Se o fallback carregar, mostramos ele
+            this.onload = function() { img.style.opacity = 1; };
+        };
+
+        // Troca os textos (pode ser instantâneo pois está invisível)
+        if(titleEl) titleEl.innerText = item.title;
+        if(descEl) descEl.innerText = item.desc;
+
+        // Inicia o carregamento da nova imagem (isso dispara o onload acima)
         img.src = item.src;
-        img.onerror = function(){this.src=item.fallback};
-        document.getElementById('hero-title').innerText = item.title;
-        img.style.opacity = 1;
-    }, 500);
+
+    }, 500); // Tempo deve bater com o CSS transition
+
 }, 5000);
 
 const themes = ['green', 'red', 'purple'];
