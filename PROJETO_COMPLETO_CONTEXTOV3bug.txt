@@ -937,371 +937,228 @@ body.theme-red .cart-header { color: #d32f2f; }
 <!DOCTYPE html>
 <html lang="pt-br">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Controle Master</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
-    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+<meta charset="UTF-8" />
+<meta name="viewport"
+      content="width=device-width, height=device-height, initial-scale=1, maximum-scale=1, user-scalable=no" />
+<title>Controle Jyan</title>
 
-    <style>
-        :root {
-            --bg-color: #121212;
-            --panel-color: #1e1e1e;
-            --accent-color: #00b3b8;
-            --active-color: #00ffea;
-            --danger-color: #d32f2f;
-            --btn-size: 85px;
-        }
+<style>
+:root {
+    --bg: #1e1e1e;
+    --btn: #3a3a3a;
+    --accent: #00b3b8;
+    --danger: #d32f2f;
+}
 
-        * { box-sizing: border-box; user-select: none; -webkit-user-select: none; -webkit-tap-highlight-color: transparent; }
+* {
+    box-sizing: border-box;
+    -webkit-tap-highlight-color: transparent;
+}
 
-        body {
-            background-color: var(--bg-color); color: white; margin: 0;
-            height: 100vh; width: 100vw; overflow: hidden;
-            font-family: 'Segoe UI', Roboto, sans-serif;
-            display: flex; flex-direction: column;
-            touch-action: none;
-        }
+html, body {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background: var(--bg);
+    font-family: system-ui, sans-serif;
+    touch-action: none;
+}
 
-        /* --- HEADER --- */
-        header {
-            background: var(--panel-color); padding: 10px 15px;
-            border-bottom: 2px solid #333; display: flex; justify-content: space-between; align-items: center;
-            z-index: 20; height: 60px; flex-shrink: 0;
-        }
-        .status-led { width: 12px; height: 12px; background: #444; border-radius: 50%; transition: 0.3s; }
-        .status-led.connected { background: #0f0; box-shadow: 0 0 10px #0f0; }
+body {
+    display: grid;
+    grid-template-rows: auto 1fr auto;
+    padding: env(safe-area-inset-top)
+             env(safe-area-inset-right)
+             env(safe-area-inset-bottom)
+             env(safe-area-inset-left);
+}
 
-        /* --- MODO CONTROLE (PADRÃO) --- */
-        #control-mode { flex: 1; display: flex; flex-direction: column; justify-content: space-between; overflow: hidden; }
+/* Header */
+header {
+    text-align: center;
+    color: white;
+    padding: 12px;
+    font-size: 20px;
+    font-weight: bold;
+}
 
-        .d-pad-container { flex: 1; display: flex; align-items: center; justify-content: center; }
-        .d-pad-grid {
-            display: grid; grid-template-columns: var(--btn-size) var(--btn-size) var(--btn-size);
-            grid-template-rows: var(--btn-size) var(--btn-size) var(--btn-size); gap: 15px;
-        }
-        .d-btn {
-            width: 100%; height: 100%; background: #333; border-radius: 15px;
-            display: flex; align-items: center; justify-content: center;
-            font-size: 40px; color: #aaa; box-shadow: 0 6px 0 #222;
-            transition: transform 0.1s, background 0.1s; cursor: pointer;
-        }
-        .d-btn:active, .d-btn.active { background: var(--accent-color); color: #000; transform: translateY(6px); box-shadow: none; }
-        .center-decor { display: flex; align-items: center; justify-content: center; color: #444; font-size: 12px; font-weight: bold; text-transform: uppercase; }
+/* Área central */
+main {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
 
-        /* --- FOOTER DO CONTROLE --- */
-        .control-footer {
-            background: var(--panel-color);
-            padding: 20px;
-            padding-bottom: 70px; /* Margem segura Android */
-            border-top-left-radius: 25px; border-top-right-radius: 25px;
-            display: flex; flex-direction: column; gap: 15px;
-            flex-shrink: 0;
-        }
-        .action-row { display: flex; gap: 10px; }
-        .btn-action {
-            flex: 1; padding: 15px; border: none; border-radius: 12px;
-            font-size: 14px; font-weight: bold; color: white;
-            display: flex; align-items: center; justify-content: center; gap: 8px;
-            box-shadow: 0 4px 0 rgba(0,0,0,0.3); background: #444;
-        }
-        .btn-action:active { transform: translateY(4px); box-shadow: none; }
-        .btn-scan { background: #ff9800; color: #000; }
-        .btn-pen { background: #9C27B0; color: #fff; }
+/* D-PAD */
+.dpad {
+    display: grid;
+    grid-template-columns: 90px 90px 90px;
+    grid-template-rows: 90px 90px 90px;
+    gap: 14px;
+}
 
-        /* --- MODO DESENHO (OVERLAY) --- */
-        #drawing-mode {
-            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            background: #111; z-index: 50; display: none; flex-direction: column;
-        }
+.dpad button {
+    width: 90px;
+    height: 90px;
+    border-radius: 18px;
+    border: none;
+    background: var(--btn);
+    color: white;
+    font-size: 34px;
+}
 
-        .draw-viewport {
-            flex: 1; position: relative; overflow: hidden; background: #000;
-            display: flex; align-items: center; justify-content: center;
-        }
+.dpad button:active {
+    background: var(--accent);
+    transform: scale(0.94);
+}
 
-        .transform-layer {
-            width: 1280px; height: 800px;
-            position: absolute;
-            transform-origin: center center;
-            background: #333;
-            box-shadow: 0 0 50px rgba(0,0,0,0.5); /* Sombra para ver os limites */
-        }
+/* Footer */
+footer {
+    padding: 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
 
-        iframe.mirror-frame {
-            width: 100%; height: 100%; border: none;
-            pointer-events: none; opacity: 0.8;
-        }
+/* Botão ação */
+.action-btn {
+    width: 100%;
+    padding: 18px;
+    font-size: 18px;
+    font-weight: bold;
+    border-radius: 14px;
+    border: none;
+    background: #ff9800;
+    color: white;
+}
 
-        canvas.draw-canvas {
-            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            cursor: crosshair;
-        }
+/* Tema */
+.theme {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    color: white;
+}
 
-        /* --- TOOLBAR DE DESENHO --- */
-        .draw-toolbar {
-            height: 100px; padding-bottom: 30px;
-            background: #222; display: flex; align-items: center; justify-content: space-around;
-            padding-left: 10px; padding-right: 10px;
-            border-top: 1px solid #444; flex-shrink: 0;
-        }
-        .tool-btn {
-            width: 50px; height: 50px; border-radius: 50%; border: none; background: #333; color: #fff;
-            display: flex; align-items: center; justify-content: center; font-size: 24px;
-        }
-        .tool-btn.active { background: var(--accent-color); color: #000; box-shadow: 0 0 10px var(--accent-color); }
-        .tool-btn.danger { background: #550000; color: #ffaaaa; }
+.theme-btn {
+    width: 54px;
+    height: 54px;
+    border-radius: 50%;
+    border: 3px solid white;
+    background: var(--accent);
+}
 
-        #color-picker-wrapper {
-            width: 40px; height: 40px; border-radius: 50%; overflow: hidden; border: 2px solid #fff; position: relative;
-        }
-        #color-input {
-            position: absolute; top: -10px; left: -10px; width: 60px; height: 60px; cursor: pointer; border: none;
-        }
-
-    </style>
+.theme-btn.red {
+    background: var(--danger);
+    box-shadow: 0 0 12px var(--danger);
+}
+</style>
 </head>
+
 <body>
 
-    <div id="control-mode">
-        <header>
-            <span style="font-weight:bold; color:#888">CONTROLE REMOTO</span>
-            <div id="statusLed" class="status-led"></div>
-        </header>
+<header>Controle Carrinho</header>
 
-        <main class="d-pad-container">
-            <div class="d-pad-grid">
-                <div></div>
-                <div class="d-btn" data-key="UP"><span class="material-icons">arrow_upward</span></div>
-                <div></div>
+<main>
+    <div class="dpad">
+        <div></div>
+        <button data-dir="up">⬆️</button>
+        <div></div>
 
-                <div class="d-btn" data-key="LEFT"><span class="material-icons">arrow_back</span></div>
-                <div class="center-decor">MOVE</div>
-                <div class="d-btn" data-key="RIGHT"><span class="material-icons">arrow_forward</span></div>
-
-                <div></div>
-                <div class="d-btn" data-key="DOWN"><span class="material-icons">arrow_downward</span></div>
-                <div></div>
-            </div>
-        </main>
-
-        <footer class="control-footer">
-            <button class="btn-action btn-scan" onclick="triggerScan()">
-                <span class="material-icons">qr_code_scanner</span> ESCANEAR
-            </button>
-            <div class="action-row">
-                <button class="btn-action btn-pen" onclick="toggleDrawingMode(true)">
-                    <span class="material-icons">edit</span> CANETA
-                </button>
-                <button class="btn-action" onclick="socket.emit('action_reset')">
-                    <span class="material-icons">restart_alt</span> RESET
-                </button>
-                <button class="btn-action" onclick="socket.emit('action_theme')">
-                    <span class="material-icons">palette</span> TEMA
-                </button>
-            </div>
-        </footer>
+        <button data-dir="left">⬅️</button>
+        <button data-dir="down">⬇️</button>
+        <button data-dir="right">➡️</button>
     </div>
+</main>
 
-    <div id="drawing-mode">
-        <div class="draw-viewport" id="viewport">
-            <div class="transform-layer" id="layer">
-                <iframe src="/" class="mirror-frame" id="mirrorIframe"></iframe>
-                <canvas id="canvas" class="draw-canvas" width="1280" height="800"></canvas>
-            </div>
-        </div>
+<footer>
+    <button class="action-btn" onclick="scanProduct()">📷 ESCANEAR PRODUTO</button>
 
-        <div class="draw-toolbar">
-            <button class="tool-btn" onclick="toggleDrawingMode(false)">
-                <span class="material-icons">arrow_back</span>
-            </button>
-
-            <div id="color-picker-wrapper">
-                <input type="color" id="color-input" value="#ff0000">
-            </div>
-
-            <button class="tool-btn active" id="btn-draw" onclick="setTool('draw')">
-                <span class="material-icons">brush</span>
-            </button>
-            <button class="tool-btn" id="btn-move" onclick="setTool('move')">
-                <span class="material-icons">pan_tool</span>
-            </button>
-
-            <button class="tool-btn danger" onclick="clearDrawings()">
-                <span class="material-icons">delete_forever</span>
-            </button>
-        </div>
+    <div class="theme">
+        <span>TEMA</span>
+        <div class="theme-btn" id="themeBtn" onclick="toggleTheme()"></div>
     </div>
+</footer>
 
-    <script>
-        const socket = io();
-        const led = document.getElementById('statusLed');
+<script>
+let interval = null;
+let currentDir = null;
 
-        socket.on('connect', () => { led.classList.add('connected'); if(navigator.vibrate) navigator.vibrate(50); });
-        socket.on('disconnect', () => led.classList.remove('connected'));
+/* Movimento contínuo */
+function sendMove(dir) {
+    fetch('/api/move', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ direction: dir })
+    }).catch(() => {});
+}
 
-        // --- HACK PARA LOGIN ---
-        const iframe = document.getElementById('mirrorIframe');
-        iframe.onload = function() {
-            try {
-                const doc = iframe.contentDocument || iframe.contentWindow.document;
-                const overlay = doc.getElementById('login-overlay');
-                if(overlay) overlay.style.display = 'none';
-                doc.body.style.cursor = 'none';
-            } catch (e) {}
-        };
+function start(dir) {
+    if (interval && currentDir === dir) return;
 
-        // --- LÓGICA DO D-PAD ---
-        document.querySelectorAll('.d-btn').forEach(btn => {
-            const key = btn.getAttribute('data-key');
-            if(!key) return;
-            const press = (e) => { if(e.type === 'touchstart') e.preventDefault(); btn.classList.add('active'); if(navigator.vibrate) navigator.vibrate(15); socket.emit('input_change', { key: key, pressed: true }); };
-            const release = (e) => { if(e.type === 'touchend') e.preventDefault(); btn.classList.remove('active'); socket.emit('input_change', { key: key, pressed: false }); };
-            btn.addEventListener('touchstart', press, { passive: false });
-            btn.addEventListener('touchend', release, { passive: false });
-            btn.addEventListener('mousedown', press);
-            btn.addEventListener('mouseup', release);
-            btn.addEventListener('mouseleave', release);
+    stop();
+    currentDir = dir;
+    sendMove(dir);
+
+    if (navigator.vibrate) navigator.vibrate(20);
+
+    interval = setInterval(() => sendMove(dir), 100);
+}
+
+function stop() {
+    clearInterval(interval);
+    interval = null;
+    currentDir = null;
+}
+
+/* Bind botões */
+document.querySelectorAll('[data-dir]').forEach(btn => {
+    const dir = btn.dataset.dir;
+
+    btn.addEventListener('touchstart', e => {
+        e.preventDefault();
+        start(dir);
+    });
+
+    btn.addEventListener('touchend', stop);
+    btn.addEventListener('touchcancel', stop);
+
+    btn.addEventListener('mousedown', () => start(dir));
+    btn.addEventListener('mouseup', stop);
+    btn.addEventListener('mouseleave', stop);
+});
+
+/* Tema */
+function toggleTheme() {
+    fetch('/api/toggle_theme', { method: 'POST' })
+        .then(r => r.json())
+        .then(data => {
+            document.getElementById('themeBtn')
+                .classList.toggle('red', data.theme === 'red');
+
+            if (navigator.vibrate) navigator.vibrate(40);
         });
+}
 
-        function triggerScan() { socket.emit('action_scan'); if(navigator.vibrate) navigator.vibrate([30, 50]); }
+/* Scan */
+function scanProduct() {
+    fetch('/api/cart/add_random', { method: 'POST' })
+        .then(() => {
+            if (navigator.vibrate) navigator.vibrate([40, 40, 40]);
+        });
+}
 
-        // --- LÓGICA DE DESENHO (CORRIGIDA E INTERPOLADA) ---
+/* Bloqueia zoom e gestos */
+document.addEventListener('gesturestart', e => e.preventDefault());
+document.addEventListener('touchmove', e => e.preventDefault(), { passive: false });
+</script>
 
-        const drawingModeEl = document.getElementById('drawing-mode');
-        const layer = document.getElementById('layer');
-        const canvas = document.getElementById('canvas');
-        const ctx = canvas.getContext('2d');
-        const viewport = document.getElementById('viewport');
-
-        let currentTool = 'draw';
-        let scale = 1, pX = 0, pY = 0;
-        let isDragging = false, startDist = 0;
-        let lastX = 0, lastY = 0;
-
-        function fitToScreen() {
-            const vw = viewport.clientWidth;
-            const vh = viewport.clientHeight;
-            scale = Math.min(vw / 1280, vh / 800) * 0.95;
-            updateTransform();
-        }
-
-        function toggleDrawingMode(show) {
-            drawingModeEl.style.display = show ? 'flex' : 'none';
-            if(show) {
-                fitToScreen();
-                if(iframe.contentWindow) iframe.contentWindow.location.reload();
-                pX = 0; pY = 0; updateTransform();
-            }
-        }
-
-        function setTool(tool) {
-            currentTool = tool;
-            document.getElementById('btn-draw').className = `tool-btn ${tool==='draw'?'active':''}`;
-            document.getElementById('btn-move').className = `tool-btn ${tool==='move'?'active':''}`;
-        }
-
-        function clearDrawings() {
-            socket.emit('draw_clear');
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            if(navigator.vibrate) navigator.vibrate(50);
-        }
-
-        function updateTransform() { layer.style.transform = `translate(${pX}px, ${pY}px) scale(${scale})`; }
-        function getDist(t1, t2) { return Math.hypot(t1.clientX - t2.clientX, t1.clientY - t2.clientY); }
-
-        // --- CÁLCULO DE COORDENADAS PRECISO ---
-        // Converte o toque na tela para o espaço interno 1280x800, independente do zoom/pan
-        function getCanvasPoint(touch) {
-            const rect = canvas.getBoundingClientRect(); // Pega tamanho visual atual (com zoom)
-
-            // Regra de três: (PosiçãoToque - InicioCanvas) * (TamanhoOriginal / TamanhoVisual)
-            const x = (touch.clientX - rect.left) * (canvas.width / rect.width);
-            const y = (touch.clientY - rect.top) * (canvas.height / rect.height);
-
-            return { x, y };
-        }
-
-        viewport.addEventListener('touchstart', (e) => {
-            e.preventDefault();
-            if (e.touches.length === 2) { startDist = getDist(e.touches[0], e.touches[1]); isDragging = false; return; }
-
-            if (currentTool === 'move') {
-                isDragging = true; lastX = e.touches[0].clientX; lastY = e.touches[0].clientY;
-            } else if (currentTool === 'draw') {
-                const p = getCanvasPoint(e.touches[0]);
-                lastX = p.x; lastY = p.y;
-                drawAndEmit(p.x, p.y, p.x, p.y); // Ponto inicial
-            }
-        }, { passive: false });
-
-        viewport.addEventListener('touchmove', (e) => {
-            e.preventDefault();
-            if (e.touches.length === 2) {
-                const newDist = getDist(e.touches[0], e.touches[1]);
-                scale = Math.min(Math.max(scale * (newDist / startDist), 0.2), 3.0);
-                startDist = newDist; updateTransform(); return;
-            }
-
-            if (currentTool === 'move' && isDragging) {
-                pX += e.touches[0].clientX - lastX; pY += e.touches[0].clientY - lastY;
-                lastX = e.touches[0].clientX; lastY = e.touches[0].clientY;
-                updateTransform();
-            } else if (currentTool === 'draw') {
-                const p = getCanvasPoint(e.touches[0]);
-
-                // Desenha linha contínua localmente
-                drawLocal(lastX, lastY, p.x, p.y);
-
-                // Emite com Interpolação (Resolve os "pontinhos" no tablet)
-                emitInterpolated(lastX, lastY, p.x, p.y);
-
-                lastX = p.x; lastY = p.y;
-            }
-        }, { passive: false });
-
-        viewport.addEventListener('touchend', () => { isDragging = false; });
-
-        // Desenha no celular (visual imediato)
-        function drawLocal(x1, y1, x2, y2) {
-            ctx.beginPath();
-            ctx.strokeStyle = document.getElementById('color-input').value;
-            ctx.lineWidth = 5; ctx.lineCap = "round";
-            ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
-        }
-
-        // Envia para o servidor com preenchimento de lacunas (Interpolação)
-        function emitInterpolated(x1, y1, x2, y2) {
-            const dist = Math.hypot(x2 - x1, y2 - y1);
-            const color = document.getElementById('color-input').value;
-
-            // Se a distância for grande, cria pontos intermediários
-            // Isso engana o Tablet para ele desenhar uma linha mais sólida
-            const steps = Math.ceil(dist / 5); // Um ponto a cada 5 pixels
-
-            for (let i = 1; i <= steps; i++) {
-                const t = i / steps;
-                const cx = x1 + (x2 - x1) * t;
-                const cy = y1 + (y2 - y1) * t;
-
-                socket.emit('draw_add', {
-                    x: cx / 1280, // Normaliza para 0.0 - 1.0
-                    y: cy / 800,
-                    color: color
-                });
-            }
-        }
-
-        // Função legado para ponto único
-        function drawAndEmit(x1, y1, x2, y2) {
-            drawLocal(x1, y1, x2, y2);
-            emitInterpolated(x1, y1, x2, y2);
-        }
-
-        document.addEventListener('gesturestart', e => e.preventDefault());
-    </script>
 </body>
 </html>
+
 
 
 ========== ARQUIVO: templates/tablet.html ==========
@@ -1314,51 +1171,8 @@ body.theme-red .cart-header { color: #d32f2f; }
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-
-    <style>
-        /* CORREÇÃO VISUAL: Fundo cinza para parecer tela cheia sem bordas pretas */
-        body {
-            background-color: #f0f0f0; /* Mesma cor do container */
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            height: 100vh;
-            width: 100vw;
-            margin: 0;
-            overflow: hidden;
-        }
-
-        #app-container {
-            width: 1280px;
-            height: 800px;
-            /* Sombra suave para o PC, invisível no celular se preencher tudo */
-            box-shadow: 0 0 50px rgba(0,0,0,0.2);
-            /* Importante para o novo cálculo de posicionamento */
-            position: absolute;
-        }
-
-        /* BLOQUEIO DE ORIENTAÇÃO (Aparece se estiver em pé) */
-        #orientation-lock {
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: #1e1e1e; z-index: 99999;
-            display: none;
-            flex-direction: column; align-items: center; justify-content: center;
-            color: white; text-align: center;
-        }
-
-        @media screen and (max-width: 900px) and (orientation: portrait) {
-            #orientation-lock { display: flex; }
-            #app-container { opacity: 0; pointer-events: none; }
-        }
-    </style>
 </head>
 <body>
-
-    <div id="orientation-lock">
-        <span class="material-icons" style="font-size: 64px; color: #00b3b8; margin-bottom: 20px; animation: rotate-icon 2s infinite">screen_rotation</span>
-        <h2>Gire seu celular</h2>
-        <p style="color:#aaa">Otimizado para modo Paisagem</p>
-    </div>
 
     <div id="app-container">
 
@@ -1425,88 +1239,6 @@ body.theme-red .cart-header { color: #d32f2f; }
     </div>
 
     <script src="{{ url_for('static', filename='script.js') }}"></script>
-
-<script>
-        // Lógica de Adaptação Híbrida (PC vs Mobile/Tablet)
-        function resizeAppSmart() {
-            const app = document.getElementById('app-container');
-            const winW = window.innerWidth;
-            const winH = window.innerHeight;
-
-            // Dimensões originais do design (Base 1280x800)
-            const baseW = 1280;
-            const baseH = 800;
-
-            // --- DETECÇÃO INTELIGENTE ---
-            // 1. É pequeno? (Menor que um monitor de 14 polegadas padrão)
-            const isSmallScreen = winW <= 1366;
-            // 2. Tem Touch? (Tablets e Celulares geralmente têm touch)
-            const isTouchDevice = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
-
-            // Se for Tela Pequena OU Dispositivo de Toque -> MODO TELA CHEIA (Stretch)
-            // Isso garante que o Tablet entre aqui e não no modo PC
-            if (isSmallScreen || isTouchDevice) {
-
-                // Calcula a escala exata para bater nas bordas
-                const scaleX = winW / baseW;
-                const scaleY = winH / baseH;
-
-                // Força o preenchimento total (pode esticar um pouco)
-                app.style.transformOrigin = 'top left';
-                app.style.transform = `scale(${scaleX}, ${scaleY})`;
-
-                // Cola nos cantos
-                app.style.left = '0px';
-                app.style.top = '0px';
-                app.style.position = 'absolute';
-
-                // Remove estilos de "janela" para parecer app nativo
-                app.style.borderRadius = '0px';
-                app.style.boxShadow = 'none';
-
-            } else {
-                // MODO PC / PROJETOR / TV (Manter proporção com margem elegante)
-                const scaleX = winW / baseW;
-                const scaleY = winH / baseH;
-
-                // Mantém a proporção correta (sem esticar) e adiciona margem
-                let scale = Math.min(scaleX, scaleY) * 0.95;
-
-                app.style.transformOrigin = 'center center';
-                app.style.transform = `scale(${scale})`;
-
-                app.style.left = 'auto';
-                app.style.top = 'auto';
-                app.style.position = 'relative'; // Volta ao fluxo normal para centralizar
-
-                app.style.borderRadius = '20px';
-                app.style.boxShadow = '0 0 50px rgba(0,0,0,0.5)';
-            }
-
-            // Corrige glitches de renderização
-            app.style.display = 'none';
-            app.offsetHeight;
-            app.style.display = 'grid';
-        }
-
-        window.addEventListener('resize', resizeAppSmart);
-        window.addEventListener('load', resizeAppSmart);
-        window.addEventListener('orientationchange', () => {
-            setTimeout(resizeAppSmart, 200);
-        });
-
-        // Ícone de girar (mantido)
-        const styleSheet = document.createElement("style");
-        styleSheet.innerText = `
-            @keyframes rotate-icon {
-                0% { transform: rotate(0deg); }
-                25% { transform: rotate(-90deg); }
-                75% { transform: rotate(-90deg); }
-                100% { transform: rotate(0deg); }
-            }
-        `;
-        document.head.appendChild(styleSheet);
-    </script>
 </body>
 </html>
 
